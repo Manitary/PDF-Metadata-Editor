@@ -20,3 +20,9 @@ classifiers = [
 
 [project.urls]
 "Homepage" = "https://github.com/Manitary/PDF-Metadata-Editor"
+
+[project.scripts]
+cli-name = "pdfMetadataEditor.pdfMetadataEditor:MainWindow"
+
+# [project.gui-scripts]
+# gui-name = "pkg.subpkg:MainWindow"
