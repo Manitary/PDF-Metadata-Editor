@@ -164,7 +164,10 @@ class MainWindow(QMainWindow):
             if self.sender() == self.form.itemAt(3 + tag, QFormLayout.ItemRole.FieldRole).itemAt(1).widget():
                 self.form.itemAt(3 + tag, QFormLayout.ItemRole.FieldRole).itemAt(0).widget().setText(self.tag_values[tag])
 
-if __name__ == '__main__':
+def main():
     app = QApplication(sys.argv)
     window = MainWindow()
     sys.exit(app.exec())
+
+if __name__ == '__main__':
+    main()
