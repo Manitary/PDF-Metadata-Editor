@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "PDFMetadataEditor"
@@ -8,6 +8,7 @@ version = "0.1"
 authors = [
   { name="Andrea Pachera" },
   { name="Gianmarco Brocchi", email="gianmarcobrocchi@gmail.com" },
+  { name="Michele Mastropietro", email="michele.mastropietro@gmail.com" },
 ]
 description = "A simple GUI to edit the PDF metadata"
 readme = "README.md"
@@ -17,15 +18,14 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: OS Independent",
 ]
+
 dependencies = ["PyQt6", "PyPDF2"]
-# packages = ["pdfMetadataEditor"]
-package-dir = {"" = "src"} ## FIXME not working with hatchling
+
+[tool.setuptools]
+package-dir = {"" = "src"}
 
 [project.urls]
 "Homepage" = "https://github.com/Manitary/PDF-Metadata-Editor"
 
-# [project.scripts]
-# cli-name = "pdfMetadataEditor.pdfMetadataEditor:MainWindow"
-
 [project.gui-scripts]
-pdf-metadata-editor = "pdfMetadataEditor:main"
+pdf-metadata-editor = "pdfMetadataEditor.pdfMetadataEditor:main"
