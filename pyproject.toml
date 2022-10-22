@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PDFMetadataEditor"
+version = "0.1"
+authors = [
+  { name="Andrea Pachera" },
+  { name="Gianmarco Brocchi", email="gianmarcobrocchi@gmail.com" },
+  { name="Michele Mastropietro", email="michele.mastropietro@gmail.com" },
+]
+description = "A simple GUI to edit the PDF metadata"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+
+dependencies = ["PyQt6", "PyPDF2"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[project.urls]
+"Homepage" = "https://github.com/Manitary/PDF-Metadata-Editor"
+
+[project.gui-scripts]
+pdf-metadata-editor = "pdfMetadataEditor.pdfMetadataEditor:main"
