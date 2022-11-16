@@ -1,21 +1,54 @@
-import sys, os
+import sys
+import os
+import logging
+import argparse
+from datetime import datetime
 from pathlib import Path
-from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QMainWindow, QFileDialog, QFormLayout, QHBoxLayout, QMessageBox
-from PyQt6.QtGui import QAction, QFont
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QMainWindow, QFileDialog, QFormLayout, QHBoxLayout, QMessageBox, QMenu
+from PyQt6.QtGui import QAction, QActionGroup, QFont, QKeySequence
+from PyQt6.QtCore import Qt, QSettings, QCoreApplication, QVariant
 from PyPDF2 import PdfReader, PdfWriter
+
+APPLICATION_NAME = "PDF Metadata Editor"
+VERSION = 0.2
+URL_GITHUB = "https://github.com/Manitary/PDF-Metadata-Editor"
+ORGANIZATION_NAME = "Manitary"
+
+QCoreApplication.setOrganizationName(ORGANIZATION_NAME)
+QCoreApplication.setOrganizationDomain(URL_GITHUB)
+QCoreApplication.setApplicationName(APPLICATION_NAME)
+settings = QSettings()
+
+#The tuples are sorted as they appear in the menu -- keep DEBUG last
+LOGGING_LEVELS = ('NONE', 'ERROR', 'DEBUG')
+LOGGING_LEVELS_TEXT = ('Disabled', 'Errors only', 'Detailed')
+
+parser = argparse.ArgumentParser(description="copy a PDF file with altered metadata")
+parser.add_argument('-d', '--debug', action='store_true', help='run with enhanced logging')
 
 TAGS = ['/Title', '/Author', '/Subject', '/Keywords', '/Producer', '/Creator']
 
 class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, debug=False, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.initialiseLogger()
         self.initializeUI()
+        if debug:
+            self.debug_toggle_act.setChecked(True)
+            self.toggleLoggingLevel(-1) #Index of DEBUG option
+        else:
+            self.toggleLoggingLevel(settings.value("LoggingLevel"))
+    
+    def initialiseLogger(self):
+        logFileName = f"logs/{datetime.now().strftime('%Y%m%d%H%M%S%f')}.log"
+        os.makedirs(os.path.dirname(logFileName), exist_ok=True)
+        self.logger = logging.getLogger(__name__)
+        self.logger.addHandler(logging.FileHandler(logFileName, delay=True))
 
     def initializeUI(self):
         self.path = os.path.expanduser('~')
         self.setGeometry(400, 400, 500, 100)
-        self.setWindowTitle("PDF Metadata Editor")
+        self.setWindowTitle(APPLICATION_NAME)
         self.createActions()
         self.createMenu()
         self.centralWidget = QWidget()
@@ -42,24 +75,69 @@ class MainWindow(QMainWindow):
         self.quit_act = QAction("Quit")
         self.quit_act.triggered.connect(self.close)
         self.open_act = QAction("Open")
+        self.open_act.setShortcut(QKeySequence.StandardKey.Open)
         self.open_act.triggered.connect(self.selectFile)
-    
+        self.about_act = QAction("About")
+        self.about_act.triggered.connect(self.showAbout)
+
     def createMenu(self):
         self.menuBar().setNativeMenuBar(False)
         file_menu = self.menuBar().addMenu("File")
         file_menu.addAction(self.open_act)
         file_menu.addAction(self.quit_act)
+        help_menu = self.menuBar().addMenu("Help")
+        logging_menu = QMenu("Logging", self)
+        logging_options = QActionGroup(logging_menu)
+        for i, level in enumerate(LOGGING_LEVELS):
+            action = QAction(LOGGING_LEVELS_TEXT[i], logging_menu, checkable=True, checked=i==int(settings.value("LoggingLevel")))
+            action.setData(QVariant(i))
+            if level == 'DEBUG':
+                self.debug_toggle_act = action
+            logging_menu.addAction(action)
+            logging_options.addAction(action)
+        logging_options.triggered.connect(self.toggleLoggingLevelManual)
+        help_menu.addMenu(logging_menu)
+        help_menu.addAction(self.about_act)
+    
+    def toggleLoggingLevelManual(self, action):
+        self.toggleLoggingLevel(action.data())
+        settings.setValue("LoggingLevel", action.data())
+
+    def toggleLoggingLevel(self, value):
+        match value:
+            case 0:
+                self.logger.setLevel(100)
+            case x:
+                self.logger.setLevel(LOGGING_LEVELS[x])
+
+    def showAbout(self):
+        QMessageBox.about(self, "About",
+        f'''
+        <p>PDF Metadata Editor v{VERSION}</p>
+
+        Source code available on <a href="{URL_GITHUB}">GitHub</a>
+        ''')
 
     def selectFile(self):
         self.file_name, _ = QFileDialog.getOpenFileName(self, "Select file", self.path, "PDF files (*.pdf)")
         if self.file_name:
             self.openFile()
 
+    def logException(self, exception):
+        self.logger.exception(f"\n[ERROR] - {datetime.now().isoformat()}")
+        QMessageBox.critical(self, "Error", f"An exception of type {type(exception).__name__} occurred.<p>Arguments:\n{exception.args!r}", QMessageBox.StandardButton.Ok)
+
     def openFile(self):
         try:
             self.path = os.path.dirname(self.file_name)
             self.file_reader = PdfReader(self.file_name)
             self.meta = self.file_reader.metadata
+        except Exception as e:
+            if type(e).__name__ == "FileNotDecryptedError":
+                QMessageBox.critical(self, "Error", f"The file is protected by password")
+            else:
+                self.logException(e)
+        else:
             '''
             for i in reversed(range(self.form.count())):
                 self.form.removeRow(i)
@@ -90,8 +168,6 @@ class MainWindow(QMainWindow):
                             self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).itemAt(j).widget().deleteLater()
                 self.form.removeRow(0)
             self.setUpMainWindow()
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"An exception of type {type(e).__name__} occurred.<p>Arguments:\n{e.args!r}", QMessageBox.StandardButton.Ok)
 
     def setUpMainWindow(self):
         self.title = QLabel(Path(self.file_name).name)
@@ -145,13 +221,20 @@ class MainWindow(QMainWindow):
         if answer == QMessageBox.StandardButton.Yes:
             try:
                 os.rename(self.file_name, f"{self.file_name}_backup")
+            except Exception as e:
+                if type(e).__name__ == "FileExistsError":
+                    QMessageBox.critical(self, "Error", "Cannot create a backup file, when that file already exists")
+                else:
+                    self.logException(e)
+            else:
                 file_writer = PdfWriter()
                 file_writer.append_pages_from_reader(self.file_reader)
                 file_writer.add_metadata(new_metadata)
-                with open(self.file_name, 'wb') as f:
-                    file_writer.write(f)
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"An exception of type {type(e).__name__} occurred.<p>Arguments:\n{e.args!r}", QMessageBox.StandardButton.Ok)
+                try:
+                    with open(self.file_name, 'wb') as f:
+                        file_writer.write(f)
+                except Exception as e:
+                    self.logException(e)
 
     def resetValues(self):
         #3: skip Title | Empty Line | Path
@@ -166,8 +249,9 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = MainWindow(debug=args.debug)
     sys.exit(app.exec())
 
 if __name__ == '__main__':
+    args = parser.parse_args()
     main()
