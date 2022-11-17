@@ -18,6 +18,8 @@ QCoreApplication.setOrganizationName(ORGANIZATION_NAME)
 QCoreApplication.setOrganizationDomain(URL_GITHUB)
 QCoreApplication.setApplicationName(APPLICATION_NAME)
 settings = QSettings()
+if not settings.value("LoggingLevel"):
+    settings.setValue("LoggingLevel", 0)
 
 #The tuples are sorted as they appear in the menu -- keep DEBUG last
 LOGGING_LEVELS = ('NONE', 'ERROR', 'DEBUG')
