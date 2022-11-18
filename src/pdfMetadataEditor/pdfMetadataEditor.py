@@ -4,10 +4,11 @@ import logging
 import argparse
 from datetime import datetime
 from pathlib import Path
-from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QMainWindow, QFileDialog, QFormLayout, QHBoxLayout, QMessageBox, QMenu
-from PyQt6.QtGui import QAction, QActionGroup, QFont, QKeySequence
+from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QMainWindow, QFileDialog, QFormLayout, QHBoxLayout, QMessageBox, QMenu, QInputDialog
+from PyQt6.QtGui import QAction, QActionGroup, QFont, QKeySequence, QDragEnterEvent, QDropEvent
 from PyQt6.QtCore import Qt, QSettings, QCoreApplication, QVariant
-from PyPDF2 import PdfReader, PdfWriter
+from PyPDF2 import PdfReader, PdfWriter, errors
+from PyPDF2.errors import FileNotDecryptedError, WrongPasswordError
 
 APPLICATION_NAME = "PDF Metadata Editor"
 VERSION = 0.2
@@ -31,7 +32,7 @@ parser.add_argument('-d', '--debug', action='store_true', help='run with enhance
 TAGS = ['/Title', '/Author', '/Subject', '/Keywords', '/Producer', '/Creator']
 
 class MainWindow(QMainWindow):
-    def __init__(self, debug=False, *args, **kwargs):
+    def __init__(self, debug: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.initialiseLogger()
         self.initializeUI()
@@ -60,13 +61,13 @@ class MainWindow(QMainWindow):
         self.form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
         self.show()
 
-    def dragEnterEvent(self, event):
+    def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls:
             event.accept()
         else:
             event.ignore()
             
-    def dropEvent(self, event):
+    def dropEvent(self, event: QDropEvent):
         for url in event.mimeData().urls():
             self.file_name = str(url.toLocalFile())
             if self.file_name.endswith('.pdf'):
@@ -101,12 +102,12 @@ class MainWindow(QMainWindow):
         help_menu.addMenu(logging_menu)
         help_menu.addAction(self.about_act)
     
-    def toggleLoggingLevelManual(self, action):
+    def toggleLoggingLevelManual(self, action: QAction):
         self.toggleLoggingLevel(action.data())
         settings.setValue("LoggingLevel", action.data())
 
-    def toggleLoggingLevel(self, value):
-        match value:
+    def toggleLoggingLevel(self, value: int):
+        match int(value):
             case 0:
                 self.logger.setLevel(100)
             case x:
@@ -125,51 +126,68 @@ class MainWindow(QMainWindow):
         if self.file_name:
             self.openFile()
 
-    def logException(self, exception):
+    def logException(self, exception: Exception):
         self.logger.exception(f"\n[ERROR] - {datetime.now().isoformat()}")
         QMessageBox.critical(self, "Error", f"An exception of type {type(exception).__name__} occurred.<p>Arguments:\n{exception.args!r}", QMessageBox.StandardButton.Ok)
 
     def openFile(self):
+        file_read = False
+        self.path = os.path.dirname(self.file_name)
         try:
-            self.path = os.path.dirname(self.file_name)
             self.file_reader = PdfReader(self.file_name)
             self.meta = self.file_reader.metadata
-        except Exception as e:
-            if type(e).__name__ == "FileNotDecryptedError":
-                QMessageBox.critical(self, "Error", f"The file is protected by password")
-            else:
-                self.logException(e)
-        else:
-            '''
-            for i in reversed(range(self.form.count())):
-                self.form.removeRow(i)
-            '''
-            '''
-            removeRow() gives error messages when deleting some rows (maybe those with a layout?)
-            So we try all possible ways of catching widgets to deleteLater(), then removeRow()
-            item -> spanning -> Widget
-                             -> HBoxLayout -> Widgets
-                 -> else -> Label -> Widget
-                         -> Field -> Widget
-                                  -> HboxLayout -> Widgets
-            '''
-            for _ in range(self.form.rowCount()):
-                if self.form.itemAt(0, QFormLayout.ItemRole.SpanningRole):
-                    if self.form.itemAt(0, QFormLayout.ItemRole.SpanningRole).widget():
-                        self.form.itemAt(0).widget().deleteLater()
+        except FileNotDecryptedError:
+            while True:
+                password, ok = QInputDialog.getText(self, "Encrypted file", "Insert password:")
+                if ok:
+                    try:
+                        self.file_reader = PdfReader(self.file_name, password=password)
+                        self.meta = self.file_reader.metadata
+                    except WrongPasswordError:
+                        QMessageBox.critical(self, "Error", f"Incorrect password")
+                    except Exception as e:
+                        self.logException(e)
                     else:
-                        for j in range(self.form.itemAt(0, QFormLayout.ItemRole.SpanningRole).count()):
-                            self.form.itemAt(0, QFormLayout.ItemRole.SpanningRole).itemAt(j).widget().deleteLater()
+                        file_read = True
+                        break
                 else:
-                    if self.form.itemAt(0, QFormLayout.ItemRole.LabelRole).widget():
-                        self.form.itemAt(0, QFormLayout.ItemRole.LabelRole).widget().deleteLater()
-                    if self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).widget():
-                        self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).widget().deleteLater()
+                    break
+        except Exception as e:
+            self.logException(e)
+        else:
+            file_read = True
+        finally:
+            if file_read:
+                '''
+                for i in reversed(range(self.form.count())):
+                    self.form.removeRow(i)
+                '''
+                '''
+                removeRow() gives error messages when deleting some rows (maybe those with a layout?)
+                So we try all possible ways of catching widgets to deleteLater(), then removeRow()
+                item -> spanning -> Widget
+                                -> HBoxLayout -> Widgets
+                    -> else -> Label -> Widget
+                            -> Field -> Widget
+                                    -> HboxLayout -> Widgets
+                '''
+                for _ in range(self.form.rowCount()):
+                    if self.form.itemAt(0, QFormLayout.ItemRole.SpanningRole):
+                        if self.form.itemAt(0, QFormLayout.ItemRole.SpanningRole).widget():
+                            self.form.itemAt(0).widget().deleteLater()
+                        else:
+                            for j in range(self.form.itemAt(0, QFormLayout.ItemRole.SpanningRole).count()):
+                                self.form.itemAt(0, QFormLayout.ItemRole.SpanningRole).itemAt(j).widget().deleteLater()
                     else:
-                        for j in range(self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).count()):
-                            self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).itemAt(j).widget().deleteLater()
-                self.form.removeRow(0)
-            self.setUpMainWindow()
+                        if self.form.itemAt(0, QFormLayout.ItemRole.LabelRole).widget():
+                            self.form.itemAt(0, QFormLayout.ItemRole.LabelRole).widget().deleteLater()
+                        if self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).widget():
+                            self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).widget().deleteLater()
+                        else:
+                            for j in range(self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).count()):
+                                self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).itemAt(j).widget().deleteLater()
+                    self.form.removeRow(0)
+                self.setUpMainWindow()
 
     def setUpMainWindow(self):
         self.title = QLabel(Path(self.file_name).name)
@@ -192,7 +210,7 @@ class MainWindow(QMainWindow):
             h.addWidget(b)
             self.form.addRow(tag[1:], h)
         for data in self.meta:
-            w = QLineEdit(self.meta[data])
+            w = QLineEdit(str(self.meta[data]))
             w.setEnabled(False)
             self.form.addRow(data[1:], w)
         self.h_buttons = QHBoxLayout()
@@ -215,19 +233,20 @@ class MainWindow(QMainWindow):
             try:
                 new_metadata[f"/{self.form.itemAt(row, QFormLayout.ItemRole.LabelRole).widget().text()}"] = self.form.itemAt(row, QFormLayout.ItemRole.FieldRole).itemAt(0).widget().text()
                 is_changed.append(self.form.itemAt(row, QFormLayout.ItemRole.FieldRole).itemAt(0).widget().isModified())
-            except Exception:
+            except AttributeError:
                 new_metadata[f"/{self.form.itemAt(row, QFormLayout.ItemRole.LabelRole).widget().text()}"] = self.form.itemAt(row, QFormLayout.ItemRole.FieldRole).widget().text()
                 is_changed.append(self.form.itemAt(row, QFormLayout.ItemRole.FieldRole).widget().isModified())
+            except Exception as e:
+                self.logException(e)
         change_list = "<br>".join(TAGS[i][1:] for i in range(len(TAGS)) if is_changed[i])
         answer = QMessageBox.question(self, "Confirm changes?", f"Apply changes to the following metadata?<p>{change_list}", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
         if answer == QMessageBox.StandardButton.Yes:
             try:
                 os.rename(self.file_name, f"{self.file_name}_backup")
+            except FileExistsError:
+                QMessageBox.critical(self, "Error", "Cannot create a backup file, when that file already exists")
             except Exception as e:
-                if type(e).__name__ == "FileExistsError":
-                    QMessageBox.critical(self, "Error", "Cannot create a backup file, when that file already exists")
-                else:
-                    self.logException(e)
+                self.logException(e)
             else:
                 file_writer = PdfWriter()
                 file_writer.append_pages_from_reader(self.file_reader)
