@@ -4,8 +4,28 @@ import logging
 import argparse
 from datetime import datetime
 from pathlib import Path
-from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QMainWindow, QFileDialog, QFormLayout, QHBoxLayout, QMessageBox, QMenu, QInputDialog
-from PyQt6.QtGui import QAction, QActionGroup, QFont, QKeySequence, QDragEnterEvent, QDropEvent
+from PyQt6.QtWidgets import (
+    QApplication,
+    QWidget,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QMainWindow,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QMessageBox,
+    QMenu,
+    QInputDialog,
+)
+from PyQt6.QtGui import (
+    QAction,
+    QActionGroup,
+    QFont,
+    QKeySequence,
+    QDragEnterEvent,
+    QDropEvent,
+)
 from PyQt6.QtCore import Qt, QSettings, QCoreApplication, QVariant
 from PyPDF2 import PdfReader, PdfWriter, errors
 from PyPDF2.errors import FileNotDecryptedError, WrongPasswordError
@@ -22,14 +42,17 @@ settings = QSettings()
 if not settings.value("LoggingLevel"):
     settings.setValue("LoggingLevel", 0)
 
-#The tuples are sorted as they appear in the menu -- keep DEBUG last
-LOGGING_LEVELS = ('NONE', 'ERROR', 'DEBUG')
-LOGGING_LEVELS_TEXT = ('Disabled', 'Errors only', 'Detailed')
+# The tuples are sorted as they appear in the menu -- keep DEBUG last
+LOGGING_LEVELS = ("NONE", "ERROR", "DEBUG")
+LOGGING_LEVELS_TEXT = ("Disabled", "Errors only", "Detailed")
 
 parser = argparse.ArgumentParser(description="copy a PDF file with altered metadata")
-parser.add_argument('-d', '--debug', action='store_true', help='run with enhanced logging')
+parser.add_argument(
+    "-d", "--debug", action="store_true", help="run with enhanced logging"
+)
 
-TAGS = ['/Title', '/Author', '/Subject', '/Keywords', '/Producer', '/Creator']
+TAGS = ["/Title", "/Author", "/Subject", "/Keywords", "/Producer", "/Creator"]
+
 
 class MainWindow(QMainWindow):
     def __init__(self, debug: bool = False, *args, **kwargs):
@@ -38,10 +61,10 @@ class MainWindow(QMainWindow):
         self.initializeUI()
         if debug:
             self.debug_toggle_act.setChecked(True)
-            self.toggleLoggingLevel(-1) #Index of DEBUG option
+            self.toggleLoggingLevel(-1)  # Index of DEBUG option
         else:
             self.toggleLoggingLevel(settings.value("LoggingLevel"))
-    
+
     def initialiseLogger(self):
         logFileName = f"logs/{datetime.now().strftime('%Y%m%d%H%M%S%f')}.log"
         os.makedirs(os.path.dirname(logFileName), exist_ok=True)
@@ -49,7 +72,7 @@ class MainWindow(QMainWindow):
         self.logger.addHandler(logging.FileHandler(logFileName, delay=True))
 
     def initializeUI(self):
-        self.path = os.path.expanduser('~')
+        self.path = os.path.expanduser("~")
         self.setGeometry(400, 400, 500, 100)
         self.setWindowTitle(APPLICATION_NAME)
         self.createActions()
@@ -66,11 +89,11 @@ class MainWindow(QMainWindow):
             event.accept()
         else:
             event.ignore()
-            
+
     def dropEvent(self, event: QDropEvent):
         for url in event.mimeData().urls():
             self.file_name = str(url.toLocalFile())
-            if self.file_name.endswith('.pdf'):
+            if self.file_name.endswith(".pdf"):
                 self.openFile()
                 break
 
@@ -92,16 +115,21 @@ class MainWindow(QMainWindow):
         logging_menu = QMenu("Logging", self)
         logging_options = QActionGroup(logging_menu)
         for i, level in enumerate(LOGGING_LEVELS):
-            action = QAction(LOGGING_LEVELS_TEXT[i], logging_menu, checkable=True, checked=i==int(settings.value("LoggingLevel")))
+            action = QAction(
+                LOGGING_LEVELS_TEXT[i],
+                logging_menu,
+                checkable=True,
+                checked=i == int(settings.value("LoggingLevel")),
+            )
             action.setData(QVariant(i))
-            if level == 'DEBUG':
+            if level == "DEBUG":
                 self.debug_toggle_act = action
             logging_menu.addAction(action)
             logging_options.addAction(action)
         logging_options.triggered.connect(self.toggleLoggingLevelManual)
         help_menu.addMenu(logging_menu)
         help_menu.addAction(self.about_act)
-    
+
     def toggleLoggingLevelManual(self, action: QAction):
         self.toggleLoggingLevel(action.data())
         settings.setValue("LoggingLevel", action.data())
@@ -114,21 +142,31 @@ class MainWindow(QMainWindow):
                 self.logger.setLevel(LOGGING_LEVELS[x])
 
     def showAbout(self):
-        QMessageBox.about(self, "About",
-        f'''
+        QMessageBox.about(
+            self,
+            "About",
+            f"""
         <p>PDF Metadata Editor v{VERSION}</p>
 
         Source code available on <a href="{URL_GITHUB}">GitHub</a>
-        ''')
+        """,
+        )
 
     def selectFile(self):
-        self.file_name, _ = QFileDialog.getOpenFileName(self, "Select file", self.path, "PDF files (*.pdf)")
+        self.file_name, _ = QFileDialog.getOpenFileName(
+            self, "Select file", self.path, "PDF files (*.pdf)"
+        )
         if self.file_name:
             self.openFile()
 
     def logException(self, exception: Exception):
         self.logger.exception(f"\n[ERROR] - {datetime.now().isoformat()}")
-        QMessageBox.critical(self, "Error", f"An exception of type {type(exception).__name__} occurred.<p>Arguments:\n{exception.args!r}", QMessageBox.StandardButton.Ok)
+        QMessageBox.critical(
+            self,
+            "Error",
+            f"An exception of type {type(exception).__name__} occurred.<p>Arguments:\n{exception.args!r}",
+            QMessageBox.StandardButton.Ok,
+        )
 
     def openFile(self):
         file_read = False
@@ -138,7 +176,9 @@ class MainWindow(QMainWindow):
             self.meta = self.file_reader.metadata
         except FileNotDecryptedError:
             while True:
-                password, ok = QInputDialog.getText(self, "Encrypted file", "Insert password:")
+                password, ok = QInputDialog.getText(
+                    self, "Encrypted file", "Insert password:"
+                )
                 if ok:
                     try:
                         self.file_reader = PdfReader(self.file_name, password=password)
@@ -158,11 +198,11 @@ class MainWindow(QMainWindow):
             file_read = True
         finally:
             if file_read:
-                '''
+                """
                 for i in reversed(range(self.form.count())):
                     self.form.removeRow(i)
-                '''
-                '''
+                """
+                """
                 removeRow() gives error messages when deleting some rows (maybe those with a layout?)
                 So we try all possible ways of catching widgets to deleteLater(), then removeRow()
                 item -> spanning -> Widget
@@ -170,22 +210,40 @@ class MainWindow(QMainWindow):
                     -> else -> Label -> Widget
                             -> Field -> Widget
                                     -> HboxLayout -> Widgets
-                '''
+                """
                 for _ in range(self.form.rowCount()):
                     if self.form.itemAt(0, QFormLayout.ItemRole.SpanningRole):
-                        if self.form.itemAt(0, QFormLayout.ItemRole.SpanningRole).widget():
+                        if self.form.itemAt(
+                            0, QFormLayout.ItemRole.SpanningRole
+                        ).widget():
                             self.form.itemAt(0).widget().deleteLater()
                         else:
-                            for j in range(self.form.itemAt(0, QFormLayout.ItemRole.SpanningRole).count()):
-                                self.form.itemAt(0, QFormLayout.ItemRole.SpanningRole).itemAt(j).widget().deleteLater()
+                            for j in range(
+                                self.form.itemAt(
+                                    0, QFormLayout.ItemRole.SpanningRole
+                                ).count()
+                            ):
+                                self.form.itemAt(
+                                    0, QFormLayout.ItemRole.SpanningRole
+                                ).itemAt(j).widget().deleteLater()
                     else:
                         if self.form.itemAt(0, QFormLayout.ItemRole.LabelRole).widget():
-                            self.form.itemAt(0, QFormLayout.ItemRole.LabelRole).widget().deleteLater()
+                            self.form.itemAt(
+                                0, QFormLayout.ItemRole.LabelRole
+                            ).widget().deleteLater()
                         if self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).widget():
-                            self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).widget().deleteLater()
+                            self.form.itemAt(
+                                0, QFormLayout.ItemRole.FieldRole
+                            ).widget().deleteLater()
                         else:
-                            for j in range(self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).count()):
-                                self.form.itemAt(0, QFormLayout.ItemRole.FieldRole).itemAt(j).widget().deleteLater()
+                            for j in range(
+                                self.form.itemAt(
+                                    0, QFormLayout.ItemRole.FieldRole
+                                ).count()
+                            ):
+                                self.form.itemAt(
+                                    0, QFormLayout.ItemRole.FieldRole
+                                ).itemAt(j).widget().deleteLater()
                     self.form.removeRow(0)
                 self.setUpMainWindow()
 
@@ -197,11 +255,11 @@ class MainWindow(QMainWindow):
         self.form.addRow(QLabel())
         self.file_path = QLineEdit(self.file_name)
         self.file_path.setEnabled(False)
-        self.form.addRow('Path', self.file_path)
+        self.form.addRow("Path", self.file_path)
         self.tag_values = []
         for tag in TAGS:
-            value = self.meta.pop(tag, '')
-            self.tag_values.append(value or '')
+            value = self.meta.pop(tag, "")
+            self.tag_values.append(value or "")
             e = QLineEdit(value)
             b = QPushButton("Reset")
             b.clicked.connect(self.resetValue)
@@ -214,8 +272,8 @@ class MainWindow(QMainWindow):
             w.setEnabled(False)
             self.form.addRow(data[1:], w)
         self.h_buttons = QHBoxLayout()
-        self.save_button = QPushButton('Save')
-        self.reset_button = QPushButton('Reset All')
+        self.save_button = QPushButton("Save")
+        self.reset_button = QPushButton("Reset All")
         self.h_buttons.addWidget(self.save_button)
         self.h_buttons.addWidget(self.reset_button)
         self.save_button.clicked.connect(self.saveFile)
@@ -228,23 +286,57 @@ class MainWindow(QMainWindow):
         new_metadata = {}
         is_changed = []
         for row in range(3, self.form.rowCount() - 2):
-            #3: skip Title | Empty Line | Path
-            #2: skip Empty Line | Buttons
+            # 3: skip Title | Empty Line | Path
+            # 2: skip Empty Line | Buttons
             try:
-                new_metadata[f"/{self.form.itemAt(row, QFormLayout.ItemRole.LabelRole).widget().text()}"] = self.form.itemAt(row, QFormLayout.ItemRole.FieldRole).itemAt(0).widget().text()
-                is_changed.append(self.form.itemAt(row, QFormLayout.ItemRole.FieldRole).itemAt(0).widget().isModified())
+                new_metadata[
+                    f"/{self.form.itemAt(row, QFormLayout.ItemRole.LabelRole).widget().text()}"
+                ] = (
+                    self.form.itemAt(row, QFormLayout.ItemRole.FieldRole)
+                    .itemAt(0)
+                    .widget()
+                    .text()
+                )
+                is_changed.append(
+                    self.form.itemAt(row, QFormLayout.ItemRole.FieldRole)
+                    .itemAt(0)
+                    .widget()
+                    .isModified()
+                )
             except AttributeError:
-                new_metadata[f"/{self.form.itemAt(row, QFormLayout.ItemRole.LabelRole).widget().text()}"] = self.form.itemAt(row, QFormLayout.ItemRole.FieldRole).widget().text()
-                is_changed.append(self.form.itemAt(row, QFormLayout.ItemRole.FieldRole).widget().isModified())
+                new_metadata[
+                    f"/{self.form.itemAt(row, QFormLayout.ItemRole.LabelRole).widget().text()}"
+                ] = (
+                    self.form.itemAt(row, QFormLayout.ItemRole.FieldRole)
+                    .widget()
+                    .text()
+                )
+                is_changed.append(
+                    self.form.itemAt(row, QFormLayout.ItemRole.FieldRole)
+                    .widget()
+                    .isModified()
+                )
             except Exception as e:
                 self.logException(e)
-        change_list = "<br>".join(TAGS[i][1:] for i in range(len(TAGS)) if is_changed[i])
-        answer = QMessageBox.question(self, "Confirm changes?", f"Apply changes to the following metadata?<p>{change_list}", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        change_list = "<br>".join(
+            TAGS[i][1:] for i in range(len(TAGS)) if is_changed[i]
+        )
+        answer = QMessageBox.question(
+            self,
+            "Confirm changes?",
+            f"Apply changes to the following metadata?<p>{change_list}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
         if answer == QMessageBox.StandardButton.Yes:
             try:
                 os.rename(self.file_name, f"{self.file_name}_backup")
             except FileExistsError:
-                QMessageBox.critical(self, "Error", "Cannot create a backup file, when that file already exists")
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    "Cannot create a backup file, when that file already exists",
+                )
             except Exception as e:
                 self.logException(e)
             else:
@@ -252,27 +344,39 @@ class MainWindow(QMainWindow):
                 file_writer.append_pages_from_reader(self.file_reader)
                 file_writer.add_metadata(new_metadata)
                 try:
-                    with open(self.file_name, 'wb') as f:
+                    with open(self.file_name, "wb") as f:
                         file_writer.write(f)
                 except Exception as e:
                     self.logException(e)
 
     def resetValues(self):
-        #3: skip Title | Empty Line | Path
+        # 3: skip Title | Empty Line | Path
         for tag in range(len(TAGS)):
-            self.form.itemAt(3 + tag, QFormLayout.ItemRole.FieldRole).itemAt(0).widget().setText(self.tag_values[tag])
-    
+            self.form.itemAt(3 + tag, QFormLayout.ItemRole.FieldRole).itemAt(
+                0
+            ).widget().setText(self.tag_values[tag])
+
     def resetValue(self):
-        #3: skip Title | Empty Line | Path
+        # 3: skip Title | Empty Line | Path
         for tag in range(len(TAGS)):
-            if self.sender() == self.form.itemAt(3 + tag, QFormLayout.ItemRole.FieldRole).itemAt(1).widget():
-                self.form.itemAt(3 + tag, QFormLayout.ItemRole.FieldRole).itemAt(0).widget().setText(self.tag_values[tag])
+            if (
+                self.sender()
+                == self.form.itemAt(3 + tag, QFormLayout.ItemRole.FieldRole)
+                .itemAt(1)
+                .widget()
+            ):
+                self.form.itemAt(3 + tag, QFormLayout.ItemRole.FieldRole).itemAt(
+                    0
+                ).widget().setText(self.tag_values[tag])
+
 
 def main():
     app = QApplication(sys.argv)
-    window = MainWindow(debug=args.debug)
+    # window = MainWindow(debug=args.debug)
+    window = MainWindow(debug=False)
     sys.exit(app.exec())
 
-if __name__ == '__main__':
-    args = parser.parse_args()
+
+if __name__ == "__main__":
+    # args = parser.parse_args()
     main()
