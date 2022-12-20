@@ -133,7 +133,7 @@ class MainWindow(QMainWindow):
         self.form.addRow("Path", self.file_path)
         self.tag_values = []
         for tag in TAGS:
-            value = self.meta.pop(tag, "")
+            value = str(self.meta.pop(tag, ""))
             self.tag_values.append(value or "")
             e = QLineEdit(value)
             b = QPushButton("Reset")
@@ -143,7 +143,7 @@ class MainWindow(QMainWindow):
             h.addWidget(b)
             self.form.addRow(tag[1:], h)
         for data in self.meta:
-            w = QLineEdit(self.meta[data])
+            w = QLineEdit(str(self.meta[data]))
             w.setEnabled(False)
             self.form.addRow(data[1:], w)
         self.h_buttons = QHBoxLayout()
