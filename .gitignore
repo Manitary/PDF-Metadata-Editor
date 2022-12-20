@@ -1,5 +1,1 @@
-build/
-dist/
-logs/
-src/logs/
 *.spec
