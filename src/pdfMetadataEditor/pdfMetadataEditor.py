@@ -13,10 +13,14 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QInputDialog,
 )
-from PyQt6.QtGui import QAction, QFont
+from PyQt6.QtGui import QAction, QFont, QKeySequence
 from PyQt6.QtCore import Qt
 from PyPDF2 import PdfReader, PdfWriter
 from PyPDF2.errors import FileNotDecryptedError, WrongPasswordError
+
+APPLICATION_NAME = "PDF Metadata Editor"
+VERSION = 0.2
+URL_GITHUB = "https://github.com/Manitary/PDF-Metadata-Editor"
 
 TAGS = ["/Title", "/Author", "/Subject", "/Keywords", "/Producer", "/Creator"]
 
@@ -38,7 +42,7 @@ class MainWindow(QMainWindow):
     def initializeUI(self):
         self.path = os.path.expanduser("~")
         self.setGeometry(400, 400, 500, 100)
-        self.setWindowTitle("PDF Metadata Editor")
+        self.setWindowTitle(APPLICATION_NAME)
         self.createActions()
         self.createMenu()
         self.centralWidget = QWidget()
@@ -65,13 +69,29 @@ class MainWindow(QMainWindow):
         self.quit_act = QAction("Quit")
         self.quit_act.triggered.connect(self.close)
         self.open_act = QAction("Open")
+        self.open_act.setShortcut(QKeySequence.StandardKey.Open)
         self.open_act.triggered.connect(self.selectFile)
+        self.about_act = QAction("About")
+        self.about_act.triggered.connect(self.showAbout)
 
     def createMenu(self):
         self.menuBar().setNativeMenuBar(False)
         file_menu = self.menuBar().addMenu("File")
         file_menu.addAction(self.open_act)
         file_menu.addAction(self.quit_act)
+        help_menu = self.menuBar().addMenu("Help")
+        help_menu.addAction(self.about_act)
+
+    def showAbout(self):
+        QMessageBox.about(
+            self,
+            "About",
+            f"""
+            <p>PDF Metadata Editor v{VERSION}</p>
+
+            Source code available on <a href="{URL_GITHUB}">GitHub</a>
+            """,
+        )
 
     def selectFile(self):
         self.file_name, _ = QFileDialog.getOpenFileName(
