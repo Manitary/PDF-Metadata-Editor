@@ -1,5 +1,6 @@
 """New version"""
 
+import os
 import sys
 import PyPDF2
 from PyQt6 import QtWidgets  # , QtGui, QtCore
@@ -24,16 +25,33 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.file_path = None
         # self.initialiseUI()
 
-    def open_file(self, file_path: str, password: str = None) -> PyPDF2.PdfReader:
-        """Return the PdfReader object for the given file, if possible.
+    def select_file(self) -> None:
+        """Handle file selection.
+
+        Open a standard file selection window, with .pdf extension as default filter.
+        If the user selects a file, set it as current file, and open it in the current session.
+        """
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Select file",
+            os.path.expanduser("~"),
+            "PDF files (*.pdf);;All files (*.*)",
+        )  # getOpenFileName returns a tuple of strings (path, filter)
+        if file_path:
+            self.file_path = file_path
+            self.open_file()
+
+    def open_current_file(self) -> PyPDF2.PdfReader:
+        """Return the PdfReader object for the current file, if possible.
 
         If the file is password-protected, prompt the user to insert the password
         until either the correct password is provided or the 'cancel' button is pressed.
         Display an error message in case of incorrect password or if the file cannot be opened."""
         try:
-            file_reader = PyPDF2.PdfReader(file_path)
+            file_reader = PyPDF2.PdfReader(self.file_path)
         except PdfReadError:
             QtWidgets.QMessageBox.critical(
                 self, "Error", "The file could not be opened"

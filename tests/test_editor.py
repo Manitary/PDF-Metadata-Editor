@@ -9,7 +9,8 @@ PASSWORD_BOTH = "foo"
 
 def test_open_unencrypted_pdf(new_window: editor.MainWindow, base_pdf: str) -> None:
     """Open a trivial pdf file."""
-    file_reader = new_window.open_file(base_pdf)
+    new_window.file_path = base_pdf
+    file_reader = new_window.open_current_file()
     assert file_reader.metadata
     # PdfReader metadata attribute is accessible if the document is not encrypted
 
@@ -21,7 +22,8 @@ def test_open_encrypted_pdf_correct_password(
     monkeypatch.setattr(
         QtWidgets.QInputDialog, "getText", lambda *args: (PASSWORD_BOTH, True)
     )
-    file_reader = new_window.open_file(encrypted_pdf_both)
+    new_window.file_path = encrypted_pdf_both
+    file_reader = new_window.open_current_file()
     assert file_reader.metadata
     # PdfReader metadata attribute is accessible if the document is successfully decrypted.
 
@@ -31,5 +33,6 @@ def test_dont_open_encrypted_pdf(
 ) -> None:
     """Fail to open an encrypted pdf file by not submitting a password."""
     monkeypatch.setattr(QtWidgets.QInputDialog, "getText", lambda *args: ("", False))
-    file_reader = new_window.open_file(encrypted_pdf_both)
+    new_window.file_path = encrypted_pdf_both
+    file_reader = new_window.open_current_file()
     assert file_reader is None
