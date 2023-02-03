@@ -44,7 +44,7 @@ def encrypted_pdf_user(tmp_path) -> Generator[Path, None, None]:
 
 
 @pytest.fixture
-def new_window(qtbot) -> editor.MainWindow:
+def new_window(qtbot) -> editor.MainWindow:  # pylint: disable=unused-argument
     """A new window of the application."""
     window = editor.MainWindow()
     yield window
