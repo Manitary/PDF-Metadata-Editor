@@ -93,6 +93,7 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__(*args, **kwargs)
         self.create_menu()
         self.central_widget = QtWidgets.QWidget()
+        self.setAcceptDrops(True)
         # self.initialiseUI()
         self.show()
 
@@ -125,6 +126,18 @@ class MainWindow(QtWidgets.QMainWindow):
             "PDF files (*.pdf);;All files (*.*)",
         )
         self.display_metadata(file_path)
+
+    def dragEnterEvent(self, event: QtGui.QDragEnterEvent) -> None:
+        """Only accept drag events for certain data."""
+        if event.mimeData().hasUrls:
+            event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event: QtGui.QDropEvent) -> None:
+        """Attempt to open the file dropped onto the window."""
+        for url in event.mimeData().urls():
+            self.display_metadata(str(url.toLocalFile()))
 
     def open_file(self, file_path: str) -> PyPDF2.PdfReader:
         """Return the PdfReader object for the current file, if possible.
