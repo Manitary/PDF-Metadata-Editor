@@ -9,6 +9,9 @@ import PyPDF2
 from PyQt6 import QtWidgets, QtGui, QtCore
 from PyPDF2.errors import PdfReadError
 
+APPLICATION_NAME = "PDF Metadata Editor"
+VERSION = 0.3
+URL_GITHUB = "https://github.com/Manitary/PDF-Metadata-Editor"
 
 TAGS = ["/Title", "/Author", "/Subject", "/Keywords", "/Producer", "/Creator"]
 
@@ -140,18 +143,48 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.setWindowTitle(APPLICATION_NAME)
+        self.setGeometry(400, 400, 500, 500)
+        self.actions = {}
+        self.create_actions()
         self.create_menu()
         self.central_widget = QtWidgets.QWidget()
         self.setAcceptDrops(True)
-        # self.initialiseUI()
         self.show()
 
+    def create_actions(self) -> None:
+        """Create the menu actions."""
+        open_action = QtGui.QAction("Open")
+        open_action.triggered.connect(self.select_file)
+        open_action.setShortcut(QtGui.QKeySequence.StandardKey.Open)
+        quit_action = QtGui.QAction("Quit")
+        quit_action.triggered.connect(self.close)
+        about_action = QtGui.QAction("About")
+        about_action.triggered.connect(self.show_about)
+        self.actions["open"] = open_action
+        self.actions["quit"] = quit_action
+        self.actions["about"] = about_action
+
     def create_menu(self) -> None:
-        """Menu creation (temporary)"""
+        """Menu creation."""
+        self.menuBar().setNativeMenuBar(False)
         file_menu = self.menuBar().addMenu("File")
-        self.open_action = QtGui.QAction("Open")
-        self.open_action.triggered.connect(self.select_file)
-        file_menu.addAction(self.open_action)
+        help_menu = self.menuBar().addMenu("Help")
+        file_menu.addAction(self.actions["open"])
+        file_menu.addAction(self.actions["quit"])
+        help_menu.addAction(self.actions["about"])
+
+    def show_about(self) -> None:
+        """Display "About" information."""
+        QtWidgets.QMessageBox.about(
+            self,
+            "About",
+            f"""
+            <p>PDF Metadata Editor v{VERSION}</p>
+
+            Source code available on <a href="{URL_GITHUB}">GitHub</a>
+            """,
+        )
 
     def display_metadata(self, file_path: str) -> None:
         """Create the GUI for the given file path, if possible."""
