@@ -23,15 +23,32 @@ def show_exception(parent: QtWidgets.QWidget, exception) -> None:
     )
 
 
+def create_file_backup(file_path: str) -> None:
+    """Rename the file for backup purposes.
+
+    If a file already exist with the backup name,
+    keep trying with an increasing counter."""
+
+    i = 0
+    while True:
+        try:
+            os.rename(file_path, f"{file_path}.bak{i if i else ''}")
+        except FileExistsError:
+            i += 1
+        else:
+            break
+
+
 class MetadataPanel(QtWidgets.QWidget):
     """The widget that effectively is the GUI to edit metadata."""
 
-    def __init__(self, file_object: PyPDF2.PdfReader, file_path: str) -> None:
+    def __init__(self, file_reader: PyPDF2.PdfReader, file_path: str) -> None:
         """Create the widget from a PdfReader object."""
         super().__init__()
         self.file_path = file_path
-        self.file_object = file_object
-        self.metadata = file_object.metadata
+        self.file_reader = file_reader
+        self.metadata = file_reader.metadata.copy()
+        self.backup = True
         self.form = QtWidgets.QFormLayout(self)
         self.build_form()
 
@@ -45,12 +62,13 @@ class MetadataPanel(QtWidgets.QWidget):
         # Empty space
         self.form.addRow(QtWidgets.QLabel())
         # Editable fields
-        reset_button = QtWidgets.QPushButton(
-            "Reset All"
-        )  # Create the 'Reset All' button here to connect signals
+        # Create the Save/Reset All buttons here to connect signals
+        save_button = QtWidgets.QPushButton("Save")
+        reset_button = QtWidgets.QPushButton("Reset All")
         for tag in TAGS:
-            field, button_function = self.form_field_from_metadata(tag)
-            reset_button.clicked.connect(button_function)
+            field, reset_function, save_function = self.form_field_from_metadata(tag)
+            reset_button.clicked.connect(reset_function)
+            save_button.clicked.connect(save_function)
             self.form.addRow(tag[1:], field)
         # Other fields
         for tag, value in {
@@ -63,7 +81,6 @@ class MetadataPanel(QtWidgets.QWidget):
         self.form.addRow(QtWidgets.QLabel())
         # Save/Reset buttons
         buttons_layout = QtWidgets.QHBoxLayout()
-        save_button = QtWidgets.QPushButton("Save")
         save_button.clicked.connect(self.save_file)
         buttons_layout.addWidget(save_button)
         buttons_layout.addWidget(reset_button)
@@ -78,15 +95,39 @@ class MetadataPanel(QtWidgets.QWidget):
 
         def button_function() -> None:
             field.setText(str(self.metadata.get(tag, "")))
+            palette = QtGui.QPalette()
+            palette.setColor(
+                QtGui.QPalette.ColorRole.Base, QtGui.QColor(QtCore.Qt.GlobalColor.white)
+            )
+            field.setPalette(palette)
 
+        def save_field() -> None:
+            self.metadata[tag] = field.text()
+
+        def highlight_edit() -> None:
+            palette = QtGui.QPalette()
+            palette.setColor(
+                QtGui.QPalette.ColorRole.Base, QtGui.QColor(QtCore.Qt.GlobalColor.red)
+            )
+            field.setPalette(palette)
+
+        field.textEdited.connect(highlight_edit)
         button.clicked.connect(button_function)
         row_layout = QtWidgets.QHBoxLayout()
         row_layout.addWidget(field)
         row_layout.addWidget(button)
-        return row_layout, button_function
+        return row_layout, button_function, save_field
 
     def save_file(self) -> None:
         """Save the file."""
+        if self.backup:
+            create_file_backup(self.file_path)
+        return
+        file_writer = PyPDF2.PdfWriter()
+        file_writer.clone_reader_document_root(self.file_reader)
+        file_writer.addMetadata({})  # TODO: finish this
+        with open(self.file_path, "wb") as f:
+            file_writer.write(f)
 
 
 class MainWindow(QtWidgets.QMainWindow):
