@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from typing import Callable
 import PyPDF2
 from PyQt6 import QtWidgets, QtGui, QtCore
 from PyPDF2.errors import PdfReadError
@@ -22,17 +23,6 @@ def show_exception(parent: QtWidgets.QWidget, exception) -> None:
     )
 
 
-def form_row_from_metadata(value: str) -> QtWidgets.QHBoxLayout:
-    """Return the field for the form row and its reset button."""
-    e = QtWidgets.QLineEdit(value)
-    b = QtWidgets.QPushButton("Reset")
-    b.clicked.connect(lambda: e.setText(value))
-    h = QtWidgets.QHBoxLayout()
-    h.addWidget(e)
-    h.addWidget(b)
-    return h, b
-
-
 class MetadataPanel(QtWidgets.QWidget):
     """The widget that effectively is the GUI to edit metadata."""
 
@@ -41,11 +31,11 @@ class MetadataPanel(QtWidgets.QWidget):
         super().__init__()
         self.file_path = file_path
         self.file_object = file_object
+        self.metadata = file_object.metadata
         self.form = QtWidgets.QFormLayout(self)
-        self.reset_buttons = []
-        self.build_form(file_object.metadata)
+        self.build_form()
 
-    def build_form(self, metadata: dict) -> None:
+    def build_form(self) -> None:
         """Create the form from the metadata."""
         # File name
         title = QtWidgets.QLabel(Path(self.file_path).name)
@@ -55,13 +45,17 @@ class MetadataPanel(QtWidgets.QWidget):
         # Empty space
         self.form.addRow(QtWidgets.QLabel())
         # Editable fields
+        reset_button = QtWidgets.QPushButton(
+            "Reset All"
+        )  # Create the 'Reset All' button here to connect signals
         for tag in TAGS:
-            value = str(metadata.pop(tag, ""))
-            field, button = form_row_from_metadata(value)
-            self.reset_buttons.append(button)
+            field, button_function = self.form_field_from_metadata(tag)
+            reset_button.clicked.connect(button_function)
             self.form.addRow(tag[1:], field)
         # Other fields
-        for tag, value in metadata.items():
+        for tag, value in {
+            (tag, value) for tag, value in self.metadata.items() if tag not in TAGS
+        }:
             field = QtWidgets.QLineEdit(str(value))
             field.setEnabled(False)
             self.form.addRow(tag[1:], field)
@@ -72,15 +66,24 @@ class MetadataPanel(QtWidgets.QWidget):
         save_button = QtWidgets.QPushButton("Save")
         save_button.clicked.connect(self.save_file)
         buttons_layout.addWidget(save_button)
-        reset_button = QtWidgets.QPushButton("Reset All")
-        reset_button.clicked.connect(self.reset_all)
         buttons_layout.addWidget(reset_button)
         self.form.addRow(buttons_layout)
 
-    def reset_all(self) -> None:
-        """Reset all fields."""
-        for button in self.reset_buttons:
-            button.click()
+    def form_field_from_metadata(
+        self, tag: str
+    ) -> tuple[QtWidgets.QHBoxLayout, Callable[[None], None]]:
+        """Return the field for the form row and its reset button."""
+        field = QtWidgets.QLineEdit(str(self.metadata.get(tag, "")))
+        button = QtWidgets.QPushButton("Reset")
+
+        def button_function() -> None:
+            field.setText(str(self.metadata.get(tag, "")))
+
+        button.clicked.connect(button_function)
+        row_layout = QtWidgets.QHBoxLayout()
+        row_layout.addWidget(field)
+        row_layout.addWidget(button)
+        return row_layout, button_function
 
     def save_file(self) -> None:
         """Save the file."""
