@@ -151,21 +151,22 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.critical(
                 self, "Error", "The file could not be opened"
             )
-        if not file_reader.is_encrypted:
-            return file_reader
-        while True:
-            password, ok = QtWidgets.QInputDialog.getText(
-                self,
-                "Encrypted file",
-                "Insert password:",
-                QtWidgets.QLineEdit.EchoMode.Password,
-            )
-            if not ok:
-                return None
-            decrypted = file_reader.decrypt(password)
-            if decrypted:
+        else:
+            if not file_reader.is_encrypted:
                 return file_reader
-            QtWidgets.QMessageBox.critical(self, "Error", "Incorrect password")
+            while True:
+                password, ok = QtWidgets.QInputDialog.getText(
+                    self,
+                    "Encrypted file",
+                    "Insert password:",
+                    QtWidgets.QLineEdit.EchoMode.Password,
+                )
+                if not ok:
+                    return None
+                decrypted = file_reader.decrypt(password)
+                if decrypted:
+                    return file_reader
+                QtWidgets.QMessageBox.critical(self, "Error", "Incorrect password")
 
 
 def main() -> None:
