@@ -130,6 +130,8 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self.display_metadata(file_path)
 
+    # Reimplement dragEnterEvent class method
+    # pylint:disable-next=invalid-name
     def dragEnterEvent(self, event: QtGui.QDragEnterEvent) -> None:
         """Only accept drag events for certain data."""
         if event.mimeData().hasUrls:
@@ -137,6 +139,8 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             event.ignore()
 
+    # Reimplement dropEvent class method
+    # pylint:disable-next=invalid-name
     def dropEvent(self, event: QtGui.QDropEvent) -> None:
         """Attempt to open the file dropped onto the window."""
         for url in event.mimeData().urls():
@@ -170,12 +174,15 @@ class MainWindow(QtWidgets.QMainWindow):
                 if decrypted:
                     return file_reader
                 QtWidgets.QMessageBox.critical(self, "Error", "Incorrect password")
+        return None
 
 
 def main() -> None:
     """Main loop."""
     app = QtWidgets.QApplication(sys.argv)
-    window = MainWindow()  # the window must be assigned to an object
+    # The window must be assigned to an object
+    # pylint: disable-next=unused-variable
+    window = MainWindow()
     sys.exit(app.exec())
 
 
