@@ -39,6 +39,17 @@ def create_file_backup(file_path: str) -> None:
             break
 
 
+def change_widget_background_colour(
+    widget: QtWidgets.QWidget, colour: QtCore.Qt.GlobalColor
+) -> None:
+    """Change a widget background colour with the assigned colour.
+
+    At the moment only works for PyQt pre-set colours."""
+    palette = QtGui.QPalette()
+    palette.setColor(QtGui.QPalette.ColorRole.Base, QtGui.QColor(colour))
+    widget.setPalette(palette)
+
+
 class MetadataPanel(QtWidgets.QWidget):
     """The widget that effectively is the GUI to edit metadata."""
 
@@ -95,21 +106,14 @@ class MetadataPanel(QtWidgets.QWidget):
 
         def button_function() -> None:
             field.setText(str(self.metadata.get(tag, "")))
-            palette = QtGui.QPalette()
-            palette.setColor(
-                QtGui.QPalette.ColorRole.Base, QtGui.QColor(QtCore.Qt.GlobalColor.white)
-            )
-            field.setPalette(palette)
+            change_widget_background_colour(field, QtCore.Qt.GlobalColor.white)
 
         def save_field() -> None:
             self.metadata[tag] = field.text()
+            change_widget_background_colour(field, QtCore.Qt.GlobalColor.white)
 
         def highlight_edit() -> None:
-            palette = QtGui.QPalette()
-            palette.setColor(
-                QtGui.QPalette.ColorRole.Base, QtGui.QColor(QtCore.Qt.GlobalColor.red)
-            )
-            field.setPalette(palette)
+            change_widget_background_colour(field, QtCore.Qt.GlobalColor.red)
 
         field.textEdited.connect(highlight_edit)
         button.clicked.connect(button_function)
