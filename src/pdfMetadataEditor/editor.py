@@ -135,7 +135,7 @@ class MetadataPanel(QtWidgets.QWidget):
             create_file_backup(self.file_path)
         file_writer = PyPDF2.PdfWriter()
         file_writer.clone_reader_document_root(self.file_reader)
-        file_writer.addMetadata(
+        file_writer.add_metadata(
             {tag: value for tag, value in self.metadata.items() if value}
         )
         with open(self.file_path, "wb") as f:
