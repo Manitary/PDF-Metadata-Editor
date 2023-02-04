@@ -1,9 +1,12 @@
 """New version"""
 
+from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
+from dataclasses import dataclass
+from collections import defaultdict
 import PyPDF2
 from PyQt6 import QtWidgets, QtGui, QtCore
 from PyPDF2.errors import PdfReadError
@@ -52,6 +55,57 @@ def change_widget_background_colour(
     widget.setPalette(palette)
 
 
+@dataclass
+class TagData:
+    """Tag value and associated widgets"""
+
+    value: str = ""
+    line_edit: QtWidgets.QLineEdit = None
+    reset_button: Optional[QtWidgets.QPushButton] = lambda: None
+    reset_function: Optional[Callable[[None], None]] = lambda: None
+    save_function: Optional[Callable[[None], None]] = lambda: None
+    modified: bool = False
+    interactive: bool = False
+
+    @classmethod
+    def from_metadata_interactive(cls, value: str = "") -> TagData:
+        """Create tag object from an interactive tag."""
+        tag = TagData(value=str(value))
+        line_edit = QtWidgets.QLineEdit(value)
+        reset_button = QtWidgets.QPushButton("Reset")
+
+        def reset_function() -> None:
+            tag.modified = False
+            line_edit.setText(tag.value)
+            change_widget_background_colour(line_edit, QtCore.Qt.GlobalColor.white)
+
+        def save_function() -> None:
+            tag.modified = False
+            tag.value = line_edit.text()
+            change_widget_background_colour(line_edit, QtCore.Qt.GlobalColor.white)
+
+        def edit_function() -> None:
+            tag.modified = True
+            change_widget_background_colour(line_edit, QtCore.Qt.GlobalColor.red)
+
+        line_edit.textEdited.connect(edit_function)
+        reset_button.clicked.connect(reset_function)
+
+        tag.line_edit = line_edit
+        tag.reset_button = reset_button
+        tag.reset_function = reset_function
+        tag.save_function = save_function
+        tag.interactive = True
+        return tag
+
+    @classmethod
+    def from_metadata_not_interactive(cls, value: str = "") -> TagData:
+        """Create tag object from a non-interactive tag."""
+        line_edit = QtWidgets.QLineEdit(str(value))
+        line_edit.setEnabled(False)
+        return TagData(value=value, line_edit=line_edit)
+
+
 class MetadataPanel(QtWidgets.QWidget):
     """The widget that effectively is the GUI to edit metadata."""
 
@@ -60,14 +114,26 @@ class MetadataPanel(QtWidgets.QWidget):
         super().__init__()
         self.file_path = file_path
         self.file_reader = file_reader
-        self.metadata = file_reader.metadata.copy()
         self.backup = True
-        self.modified_fields = set()
+        self.tags = defaultdict(TagData)
+        self.create_tags()
         self.form = QtWidgets.QFormLayout(self)
+        self.other_interactive_widgets = {}
         self.build_form()
 
+    def create_tags(self) -> None:
+        """Create all objects related to each tag."""
+        for tag in TAGS:
+            self.tags[tag] = TagData.from_metadata_interactive(
+                self.file_reader.metadata.get(tag, "")
+            )
+
+        for tag, value in self.file_reader.metadata.items():
+            if tag not in TAGS:
+                self.tags[tag] = TagData.from_metadata_not_interactive(value)
+
     def build_form(self) -> None:
-        """Create the form from the metadata."""
+        """Create the form from the tags."""
         # File name
         title = QtWidgets.QLabel(Path(self.file_path).name)
         title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
@@ -75,68 +141,47 @@ class MetadataPanel(QtWidgets.QWidget):
         self.form.addRow(title)
         # Empty space
         self.form.addRow(QtWidgets.QLabel())
+        # Path
+        path_field = QtWidgets.QLineEdit(str(self.file_path))
+        path_field.setEnabled(False)
+        self.form.addRow("Path", path_field)
         # Editable fields
-        # Create the Save/Reset All buttons here to connect signals
-        save_button = QtWidgets.QPushButton("Save")
-        reset_button = QtWidgets.QPushButton("Reset All")
         for tag in TAGS:
-            field, reset_function, save_function = self.form_field_from_metadata(tag)
-            reset_button.clicked.connect(reset_function)
-            save_button.clicked.connect(save_function)
-            self.form.addRow(tag[1:], field)
+            row_layout = QtWidgets.QHBoxLayout()
+            row_layout.addWidget(self.tags[tag].line_edit)
+            row_layout.addWidget(self.tags[tag].reset_button)
+            self.form.addRow(tag[1:], row_layout)
         # Other fields
-        for tag, value in {
-            (tag, value) for tag, value in self.metadata.items() if tag not in TAGS
-        }:
-            field = QtWidgets.QLineEdit(str(value))
-            field.setEnabled(False)
-            self.form.addRow(tag[1:], field)
+        for tag, data in self.tags.items():
+            if not data.interactive:
+                self.form.addRow(tag[1:], data.line_edit)
         # Empty space
         self.form.addRow(QtWidgets.QLabel())
         # Save/Reset buttons
         buttons_layout = QtWidgets.QHBoxLayout()
+        save_button = QtWidgets.QPushButton("Save")
+        reset_button = QtWidgets.QPushButton("Reset All")
         save_button.clicked.connect(self.save_file)
+        for data in self.tags.values():
+            reset_button.clicked.connect(data.reset_function)
         buttons_layout.addWidget(save_button)
         buttons_layout.addWidget(reset_button)
+        self.other_interactive_widgets["save"] = save_button
+        self.other_interactive_widgets["reset"] = reset_button
         self.form.addRow(buttons_layout)
-
-    def form_field_from_metadata(
-        self, tag: str
-    ) -> tuple[QtWidgets.QHBoxLayout, Callable[[None], None]]:
-        """Return the field for the form row and its reset button."""
-        field = QtWidgets.QLineEdit(str(self.metadata.get(tag, "")))
-        button = QtWidgets.QPushButton("Reset")
-
-        def reset_function() -> None:
-            field.setText(str(self.metadata.get(tag, "")))
-            change_widget_background_colour(field, QtCore.Qt.GlobalColor.white)
-            self.modified_fields.discard(tag)
-
-        def save_field() -> None:
-            self.metadata[tag] = field.text()
-            change_widget_background_colour(field, QtCore.Qt.GlobalColor.white)
-
-        def edit_function() -> None:
-            change_widget_background_colour(field, QtCore.Qt.GlobalColor.red)
-            self.modified_fields.add(tag)
-
-        field.textEdited.connect(edit_function)
-        button.clicked.connect(reset_function)
-        row_layout = QtWidgets.QHBoxLayout()
-        row_layout.addWidget(field)
-        row_layout.addWidget(button)
-        return row_layout, reset_function, save_field
 
     def save_file(self) -> None:
         """Save the file."""
-        if not self.modified_fields:
+        if all(not data.modified for data in self.tags.values()):
             return
+        for data in self.tags.values():
+            data.save_function()
         if self.backup:
             create_file_backup(self.file_path)
         file_writer = PyPDF2.PdfWriter()
         file_writer.clone_reader_document_root(self.file_reader)
         file_writer.add_metadata(
-            {tag: value for tag, value in self.metadata.items() if value}
+            {tag: data.value for tag, data in self.tags.items() if data.value}
         )
         with open(self.file_path, "wb") as f:
             file_writer.write(f)
