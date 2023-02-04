@@ -62,6 +62,7 @@ class MetadataPanel(QtWidgets.QWidget):
         self.file_reader = file_reader
         self.metadata = file_reader.metadata.copy()
         self.backup = True
+        self.modified_fields = set()
         self.form = QtWidgets.QFormLayout(self)
         self.build_form()
 
@@ -106,26 +107,30 @@ class MetadataPanel(QtWidgets.QWidget):
         field = QtWidgets.QLineEdit(str(self.metadata.get(tag, "")))
         button = QtWidgets.QPushButton("Reset")
 
-        def button_function() -> None:
+        def reset_function() -> None:
             field.setText(str(self.metadata.get(tag, "")))
             change_widget_background_colour(field, QtCore.Qt.GlobalColor.white)
+            self.modified_fields.discard(tag)
 
         def save_field() -> None:
             self.metadata[tag] = field.text()
             change_widget_background_colour(field, QtCore.Qt.GlobalColor.white)
 
-        def highlight_edit() -> None:
+        def edit_function() -> None:
             change_widget_background_colour(field, QtCore.Qt.GlobalColor.red)
+            self.modified_fields.add(tag)
 
-        field.textEdited.connect(highlight_edit)
-        button.clicked.connect(button_function)
+        field.textEdited.connect(edit_function)
+        button.clicked.connect(reset_function)
         row_layout = QtWidgets.QHBoxLayout()
         row_layout.addWidget(field)
         row_layout.addWidget(button)
-        return row_layout, button_function, save_field
+        return row_layout, reset_function, save_field
 
     def save_file(self) -> None:
         """Save the file."""
+        if not self.modified_fields:
+            return
         if self.backup:
             create_file_backup(self.file_path)
         file_writer = PyPDF2.PdfWriter()
