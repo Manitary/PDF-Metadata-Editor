@@ -17,6 +17,9 @@ URL_GITHUB = "https://github.com/Manitary/PDF-Metadata-Editor"
 
 TAGS = ["/Title", "/Author", "/Subject", "/Keywords", "/Producer", "/Creator"]
 
+BG_DEFAULT = QtCore.Qt.GlobalColor.white
+BG_HIGHLIGHT = QtCore.Qt.GlobalColor.red
+
 
 def show_exception(parent: QtWidgets.QWidget, exception) -> None:
     """Display an error message when an exception occurs."""
@@ -80,15 +83,15 @@ class TagData:
         def save_function() -> None:
             tag.modified = False
             tag.value = line_edit.text()
-            change_widget_background_colour(line_edit, QtCore.Qt.GlobalColor.white)
+            change_widget_background_colour(line_edit, BG_DEFAULT)
 
         def edit_function() -> None:
             if line_edit.text() == value:
                 tag.modified = False
-                change_widget_background_colour(line_edit, QtCore.Qt.GlobalColor.white)
+                change_widget_background_colour(line_edit, BG_DEFAULT)
             else:
                 tag.modified = True
-                change_widget_background_colour(line_edit, QtCore.Qt.GlobalColor.red)
+                change_widget_background_colour(line_edit, BG_HIGHLIGHT)
 
         line_edit.textChanged.connect(edit_function)
         reset_button.clicked.connect(reset_function)
