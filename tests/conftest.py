@@ -13,6 +13,13 @@ SAMPLE_ROOT = PROJECT_ROOT / "samples"
 
 
 @pytest.fixture
+def not_pdf(tmp_path: Path) -> Generator[Path, None, None]:
+    """Non-pdf file."""
+    copy_path = shutil.copy2(SAMPLE_ROOT / "not-a-pdf.txt", tmp_path / "file.pdf")
+    yield copy_path
+
+
+@pytest.fixture
 def base_pdf(tmp_path: Path) -> Generator[Path, None, None]:
     """Empty pdf file."""
     copy_path = shutil.copy2(

@@ -12,10 +12,24 @@ PASSWORD = "asdfzxcv"
 PASSWORD_BOTH = "foo"
 
 
+def test_open_not_pdf(
+    window: editor.MainWindow,
+    not_pdf: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fail to open a non-pdf file."""
+    monkeypatch.setattr(
+        QtWidgets.QMessageBox,
+        "critical",
+        lambda *args: None,
+    )
+    file_reader = window.open_file(not_pdf)
+    assert file_reader is None
+
+
 def test_open_unencrypted_pdf(window: editor.MainWindow, base_pdf: Path) -> None:
     """Open a trivial pdf file."""
-    window.file_path = base_pdf
-    file_reader = window.open_file(window.file_path)
+    file_reader = window.open_file(base_pdf)
     assert file_reader.metadata
     # PdfReader metadata attribute is accessible if the document is not encrypted
 
