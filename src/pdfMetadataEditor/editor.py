@@ -75,9 +75,7 @@ class TagData:
         reset_button = QtWidgets.QPushButton("Reset")
 
         def reset_function() -> None:
-            tag.modified = False
             line_edit.setText(tag.value)
-            change_widget_background_colour(line_edit, QtCore.Qt.GlobalColor.white)
 
         def save_function() -> None:
             tag.modified = False
@@ -85,10 +83,14 @@ class TagData:
             change_widget_background_colour(line_edit, QtCore.Qt.GlobalColor.white)
 
         def edit_function() -> None:
-            tag.modified = True
-            change_widget_background_colour(line_edit, QtCore.Qt.GlobalColor.red)
+            if line_edit.text() == value:
+                tag.modified = False
+                change_widget_background_colour(line_edit, QtCore.Qt.GlobalColor.white)
+            else:
+                tag.modified = True
+                change_widget_background_colour(line_edit, QtCore.Qt.GlobalColor.red)
 
-        line_edit.textEdited.connect(edit_function)
+        line_edit.textChanged.connect(edit_function)
         reset_button.clicked.connect(reset_function)
 
         tag.line_edit = line_edit
