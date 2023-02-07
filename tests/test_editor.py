@@ -5,7 +5,7 @@ from pathlib import Path
 import PyPDF2
 import pytest
 from pytestqt.qtbot import QtBot
-from PyQt6 import QtWidgets
+from PyQt6 import QtWidgets, QtCore
 from pdfMetadataEditor import editor
 
 PASSWORD = "asdfzxcv"
@@ -77,7 +77,7 @@ def test_save_file_no_actions(window: editor.MainWindow, base_pdf: Path) -> None
 def test_save_file_after_one_edit_reset(
     qtbot: QtBot, window: editor.MainWindow, base_pdf: Path, tag: str
 ) -> None:
-    """A metadata field is edited and then reset.
+    """A metadata field is edited and then reset using its reset button.
 
     Parameter: the tag that is edited."""
     expected = base_pdf.read_bytes()
@@ -85,6 +85,32 @@ def test_save_file_after_one_edit_reset(
     dir_path = base_pdf.parent
     window.display_metadata(base_pdf)
     qtbot.keyPress(window.central_widget.tags[tag].line_edit, "a")
+    window.central_widget.tags[tag].reset_button.click()
+    window.central_widget.save_file()
+    files = os.listdir(dir_path)
+    # No new file is created
+    assert len(files) == 1
+    # The file is not renamed
+    assert files[0] == file_name
+    # The contents of the file have not changed
+    assert (dir_path / file_name).read_bytes() == expected
+
+
+@pytest.mark.parametrize("tag", editor.TAGS)
+def test_save_file_after_one_edit_reverted(
+    qtbot: QtBot, window: editor.MainWindow, base_pdf: Path, tag: str
+) -> None:
+    """A metadata field is edited and then manually reverted.
+
+    Parameter: the tag that is edited."""
+    expected = base_pdf.read_bytes()
+    file_name = base_pdf.name
+    dir_path = base_pdf.parent
+    window.display_metadata(base_pdf)
+    qtbot.keyPress(window.central_widget.tags[tag].line_edit, "a")
+    qtbot.keyPress(
+        window.central_widget.tags[tag].line_edit, QtCore.Qt.Key.Key_Backspace
+    )
     window.central_widget.tags[tag].reset_button.click()
     window.central_widget.save_file()
     files = os.listdir(dir_path)
@@ -121,11 +147,7 @@ def test_save_file_after_all_edit_reset(
 def test_save_file_after_field_edit(
     qtbot: QtBot, window: editor.MainWindow, base_pdf: Path, tag: str
 ) -> None:
-    """A metadata field is edited and changes are saved.
-
-    * A new file is created.
-    * The bytes of the backup file are identical to those of the original file.
-    * The bytes of the new file are different from those of the original file."""
+    """A metadata field is edited and changes are saved."""
     original_bytes = base_pdf.read_bytes()
     file_name = base_pdf.name
     backup_name = file_name + ".bak"
@@ -144,11 +166,11 @@ def test_save_file_after_field_edit(
     assert (dir_path / backup_name).read_bytes() == original_bytes
     # The new file contents are different
     assert (dir_path / file_name).read_bytes() != original_bytes
-    # All metadata except the modified one are the same
+    # All metadata except the specified one are unchanged
     assert all(
         value == new_reader.metadata[key]
         for key, value in original_reader.metadata.items()
         if key != tag
     )
-    # The metadata field was edited correctly
+    # The specified metadata was edited correctly
     assert new_reader.metadata[tag] == original_reader.metadata.get(tag, "") + "a"
