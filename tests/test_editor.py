@@ -174,3 +174,37 @@ def test_save_file_after_field_edit(
     )
     # The specified metadata was edited correctly
     assert new_reader.metadata[tag] == original_reader.metadata.get(tag, "") + "a"
+
+
+def test_modify_file_twice(
+    qtbot: QtBot, window: editor.MainWindow, base_pdf: Path
+) -> None:
+    """The same file is modified and saved more than once.
+
+    Test creation of backup files with overlapping names."""
+    tag = "/Title"  # No need to parametrise this test
+    original_bytes = base_pdf.read_bytes()
+    file_name = base_pdf.name
+    backup_name = file_name + ".bak"
+    backup_name_1 = file_name + ".bak1"
+    dir_path = base_pdf.parent
+    window.display_metadata(base_pdf)
+    qtbot.keyPress(window.central_widget.tags[tag].line_edit, "a")
+    window.central_widget.save_file()
+    qtbot.keyPress(window.central_widget.tags[tag].line_edit, "a")
+    window.central_widget.save_file()
+    files = os.listdir(dir_path)
+    # Two new files are created
+    assert len(files) == 3
+    # The files have the correct names
+    assert set(files) == {file_name, backup_name, backup_name_1}
+    # The older backup file has the same contents as the original file
+    assert (dir_path / backup_name).read_bytes() == original_bytes
+    # Each file has the expected change in the given metadata field
+    assert PyPDF2.PdfReader(dir_path / backup_name).metadata.get(
+        tag, ""
+    ) + "a" == PyPDF2.PdfReader(dir_path / backup_name_1).metadata.get(tag, "")
+    assert (
+        PyPDF2.PdfReader(dir_path / backup_name_1).metadata[tag] + "a"
+        == PyPDF2.PdfReader(dir_path / file_name).metadata[tag]
+    )
