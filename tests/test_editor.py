@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from unittest.mock import Mock
 import PyPDF2
 import pytest
 from pytestqt.qtbot import QtBot
@@ -41,6 +42,19 @@ def test_open_encrypted_pdf_correct_password(
     monkeypatch.setattr(
         QtWidgets.QInputDialog, "getText", lambda *args: (PASSWORD_BOTH, True)
     )
+    window.file_path = encrypted_pdf_both
+    file_reader = window.open_file(window.file_path)
+    assert file_reader.metadata
+    # PdfReader metadata attribute is accessible if the document is successfully decrypted.
+
+
+def test_open_encrypted_pdf_wrong_then_correct_password(
+    window: editor.MainWindow, encrypted_pdf_both: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Use the wrong password and then the correct password to open an encrypted file."""
+    mock = Mock(side_effect=[("wrong_password", True), (PASSWORD_BOTH, True)])
+    monkeypatch.setattr(QtWidgets.QInputDialog, "getText", mock)
+    monkeypatch.setattr(QtWidgets.QMessageBox, "critical", lambda *args: None)
     window.file_path = encrypted_pdf_both
     file_reader = window.open_file(window.file_path)
     assert file_reader.metadata
