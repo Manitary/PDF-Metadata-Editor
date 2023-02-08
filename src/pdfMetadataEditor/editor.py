@@ -12,7 +12,7 @@ from PyQt6 import QtWidgets, QtGui, QtCore
 from PyPDF2.errors import PdfReadError
 
 APPLICATION_NAME = "PDF Metadata Editor"
-VERSION = 0.3
+VERSION = 0.2
 URL_GITHUB = "https://github.com/Manitary/PDF-Metadata-Editor"
 
 TAGS = ["/Title", "/Author", "/Subject", "/Keywords", "/Producer", "/Creator"]
