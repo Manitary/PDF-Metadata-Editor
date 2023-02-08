@@ -28,4 +28,4 @@ package-dir = {"" = "src"}
 "Homepage" = "https://github.com/Manitary/PDF-Metadata-Editor"
 
 [project.gui-scripts]
-pdf-metadata-editor = "pdfMetadataEditor.pdfMetadataEditor:main"
+pdf-metadata-editor = "pdfMetadataEditor.editor:main"
