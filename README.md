@@ -27,7 +27,7 @@ which will install all required dependencies and install a new `pdf-metadata-edi
 
 ## Known issues
 
-- The window does not resize automatically when a new PDF is opened
+- When a new PDF is opened, the window only resize by expanding, if needed. This is particularly noticeable when opening files with a long name.
 
 ## Licence
 
