@@ -19,7 +19,7 @@ from PyPDF2 import PdfReader, PdfWriter
 from PyPDF2.errors import FileNotDecryptedError, WrongPasswordError
 
 APPLICATION_NAME = "PDF Metadata Editor"
-VERSION = 0.2
+VERSION = "0.1.1"
 URL_GITHUB = "https://github.com/Manitary/PDF-Metadata-Editor"
 
 TAGS = ["/Title", "/Author", "/Subject", "/Keywords", "/Producer", "/Creator"]
