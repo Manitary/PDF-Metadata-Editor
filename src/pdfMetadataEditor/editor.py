@@ -197,9 +197,9 @@ class MetadataPanel(QtWidgets.QWidget):
                         "The original file may have been renamed, moved, or deleted."
                     ),
                 )
-                break
+                return
             else:
-                break
+                return
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -295,29 +295,55 @@ class MainWindow(QtWidgets.QMainWindow):
         If the file is password-protected, prompt the user to insert the password
         until either the correct password is provided or the 'cancel' button is pressed.
         Display an error message in case of incorrect password or if the file cannot be opened."""
+        # Catch files that cannot be read (e.g. non-pdf files).
         try:
             file_reader = PyPDF2.PdfReader(file_path)
         except PdfReadError:
             QtWidgets.QMessageBox.critical(
                 self, "Error", "The file could not be opened"
             )
-        else:
-            if not file_reader.is_encrypted:
-                return file_reader
-            while True:
+            return None
+        if file_reader.is_encrypted:
+            decrypted = None
+            while not decrypted:
                 password, ok = QtWidgets.QInputDialog.getText(
                     self,
                     "Encrypted file",
                     "Insert password:",
                     QtWidgets.QLineEdit.EchoMode.Password,
                 )
+                # Do nothing if the Cancel button is selected.
                 if not ok:
                     return None
-                decrypted = file_reader.decrypt(password)
-                if decrypted:
-                    return file_reader
+            decrypted = file_reader.decrypt(password)
+            # Display an error message if the password is incorrect.
+            if not decrypted:
                 QtWidgets.QMessageBox.critical(self, "Error", "Incorrect password")
-        return None
+        # Robustness check, ask confirmation from the user to continue.
+        try:
+            file_reader_robust = PyPDF2.PdfReader(file_path, strict=True)
+            assert file_reader_robust.metadata
+        except PdfReadError:
+            answer = QtWidgets.QMessageBox.question(
+                self,
+                "Warning",
+                (
+                    "The selected file does not seem to follow PDF specifications."
+                    "<br>"
+                    "Attempting to alter the file may result in unexpected behaviour."
+                    "<p>"
+                    "Do you wish to continue?"
+                ),
+                QtWidgets.QMessageBox.StandardButton.Yes
+                | QtWidgets.QMessageBox.StandardButton.No,
+                QtWidgets.QMessageBox.StandardButton.No,
+            )
+            if answer != QtWidgets.QMessageBox.StandardButton.Yes:
+                return None
+        except AssertionError:
+            pass
+
+        return file_reader
 
 
 def main() -> None:
