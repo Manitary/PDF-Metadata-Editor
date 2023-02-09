@@ -315,13 +315,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 # Do nothing if the Cancel button is selected.
                 if not ok:
                     return None
-            decrypted = file_reader.decrypt(password)
-            # Display an error message if the password is incorrect.
-            if not decrypted:
-                QtWidgets.QMessageBox.critical(self, "Error", "Incorrect password")
+                decrypted = file_reader.decrypt(password)
+                # Display an error message if the password is incorrect.
+                if not decrypted:
+                    QtWidgets.QMessageBox.critical(self, "Error", "Incorrect password")
         # Robustness check, ask confirmation from the user to continue.
         try:
-            file_reader_robust = PyPDF2.PdfReader(file_path, strict=True)
+            file_reader_robust = PyPDF2.PdfReader(
+                file_path,
+                strict=True,
+                password=password if file_reader.is_encrypted else None,
+            )
             assert file_reader_robust.metadata
         except PdfReadError:
             answer = QtWidgets.QMessageBox.question(
