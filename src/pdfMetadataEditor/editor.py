@@ -31,22 +31,6 @@ def show_exception(parent: QtWidgets.QWidget, exception) -> None:
     )
 
 
-def create_file_backup(file_path: str) -> None:
-    """Rename the file for backup purposes.
-
-    If a file already exist with the backup name,
-    keep trying with an increasing counter."""
-
-    i = 0
-    while True:
-        try:
-            os.rename(file_path, f"{file_path}.bak{i if i else ''}")
-        except FileExistsError:
-            i += 1
-        else:
-            break
-
-
 def change_widget_background_colour(
     widget: QtWidgets.QWidget, colour: QtCore.Qt.GlobalColor
 ) -> None:
@@ -182,7 +166,7 @@ class MetadataPanel(QtWidgets.QWidget):
         for data in self.tags.values():
             data.save_function()
         if self.backup:
-            create_file_backup(self.file_path)
+            self.create_file_backup(self.file_path)
         file_writer = PyPDF2.PdfWriter()
         file_writer.clone_reader_document_root(self.file_reader)
         file_writer.add_metadata(
@@ -190,6 +174,32 @@ class MetadataPanel(QtWidgets.QWidget):
         )
         with open(self.file_path, "wb") as f:
             file_writer.write(f)
+
+    def create_file_backup(self, file_path: str) -> None:
+        """Rename the file for backup purposes.
+
+        If a file already exist with the backup name,
+        keep trying with an increasing counter."""
+
+        i = 0
+        while True:
+            try:
+                os.rename(file_path, f"{file_path}.bak{i if i else ''}")
+            except FileExistsError:
+                i += 1
+            except FileNotFoundError:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "Missing file",
+                    (
+                        "The backup file was not created."
+                        "<p>"
+                        "The original file may have been renamed, moved, or deleted."
+                    ),
+                )
+                break
+            else:
+                break
 
 
 class MainWindow(QtWidgets.QMainWindow):

@@ -87,6 +87,28 @@ def test_save_file_no_actions(window: editor.MainWindow, base_pdf: Path) -> None
     assert (dir_path / file_name).read_bytes() == expected
 
 
+def test_save_file_after_deleted_original(
+    window: editor.MainWindow, base_pdf: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Don't create a backup if the original file was deleted."""
+    monkeypatch.setattr(QtWidgets.QMessageBox, "warning", lambda *args: None)
+    tag = "/Title"  # No need to parametrise this test
+    original_bytes = base_pdf.read_bytes()
+    file_name = base_pdf.name
+    dir_path = base_pdf.parent
+    window.display_metadata(base_pdf)
+    QtBot.keyPress(window.central_widget.tags[tag].line_edit, "a")
+    os.remove(base_pdf)
+    window.central_widget.save_file()
+    files = os.listdir(dir_path)
+    # No backup file is created
+    assert len(files) == 1
+    # The only file has the original file name
+    assert files[0] == file_name
+    # The new file is not the original file
+    assert (dir_path / file_name).read_bytes() != original_bytes
+
+
 @pytest.mark.parametrize("tag", editor.TAGS)
 def test_save_file_after_one_edit_reset(
     qtbot: QtBot, window: editor.MainWindow, base_pdf: Path, tag: str
