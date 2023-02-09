@@ -21,16 +21,6 @@ BG_DEFAULT = QtCore.Qt.GlobalColor.white
 BG_HIGHLIGHT = QtCore.Qt.GlobalColor.red
 
 
-def show_exception(parent: QtWidgets.QWidget, exception) -> None:
-    """Display an error message when an exception occurs."""
-    QtWidgets.QMessageBox.critical(
-        parent,
-        "Error",
-        f"""An exception of type {type(exception).__name__} occurred.
-<p>Arguments:\n{exception.args!r}""",
-    )
-
-
 def change_widget_background_colour(
     widget: QtWidgets.QWidget, colour: QtCore.Qt.GlobalColor
 ) -> None:
