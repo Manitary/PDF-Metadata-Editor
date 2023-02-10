@@ -57,9 +57,9 @@ class TagData:
     Methods
     -------
     from_metadata_interactive(value="")
-        Create a TagData object with the given value and an interactive ``line_edit``.
+        Create and return a TagData object with the given value and an interactive ``line_edit``.
     from_metadata_not_interactive(value="")
-        Create a TagData object with the given value and a non-interactive ``line_edit``.
+        Create and return a TagData object with the given value and a non-interactive ``line_edit``.
     change_widget_background_colour(widget, colour)
         Change the background colour of ``widget`` to ``colour``.
     """
@@ -156,77 +156,133 @@ class TagData:
 
 
 class MetadataPanel(QtWidgets.QWidget):
-    """The widget that effectively is the GUI to edit metadata."""
+    """A class that handles the effective GUI responsible for editing metadata.
+
+    Attributes
+    ----------
+    file_path : str
+        The path of the file whose metadata is going to be edited.
+    file_reader : PdfReader
+        The PdfReader object of the file at ``file_path``.
+    form : QFormLayout
+        The widget containing the interface used to edit metadata.
+        (editable fields, Save/Reset buttons, etc.)
+    tags : dict[str, TagData]
+        A dictionary tag -> TagData for each metadata tag of the ``file_reader`` object.
+        Allows easy access to the metadata values and the associated widgets contained in ``form``.
+    other_interactive_widgets : dict[str, QtWidgets]
+        A dictionary to easily access other interactive widgets that are not tied to a single tag.
+    backup : bool
+        If True, the file at ``file_path`` is renamed for backup before saving the edited metadata.
+
+    Methods
+    -------
+    build_form()
+        Create the widgets to include in ``form`` based on the contents of ``tags``.
+    create_tags(file_reader)
+        Return a dictionary tag -> TagData from the metadata of the file_reader object.
+    create_file_backup()
+        Rename the file at ``file_path`` for backup purposes.
+    save_file()
+        If any metadata field was edited, save the changes into a new file with path ``file_path``.
+    """
 
     def __init__(self, file_reader: PyPDF2.PdfReader, file_path: str) -> None:
-        """Create the widget from a PdfReader object."""
+        """Create the widget from a PdfReader object.
+
+        Parameters
+        ----------
+        file_reader : PdfReader
+            The PdfReader object of the file whose metadata will be edited.
+        file_path : str
+            The path of the file used in ``file_reader``.
+        """
         super().__init__()
         self.file_path = file_path
         self.file_reader = file_reader
         self.backup = True
-        self.tags = defaultdict(TagData)
-        self.create_tags()
-        self.form = QtWidgets.QFormLayout(self)
-        self.other_interactive_widgets = {}
-        self.build_form()
+        self.tags = self.create_tags(file_reader)
+        self.form, self.other_interactive_widgets = self.build_form()
 
-    def create_tags(self) -> None:
-        """Create all objects related to each tag."""
+    @staticmethod
+    def create_tags(file_reader: PyPDF2.PdfReader) -> dict[str, TagData]:
+        """Return the tag -> TagData dictionary based on the file_reader metadata.
+
+        Parameters
+        ----------
+        file_reader : PdfReader
+            The PdfReader object whose metadata are used.
+        """
+        tags = defaultdict(TagData)
+        # Editable fields
         for tag in TAGS:
-            self.tags[tag] = TagData.from_metadata_interactive(
-                self.file_reader.metadata.get(tag, "")
+            tags[tag] = TagData.from_metadata_interactive(
+                file_reader.metadata.get(tag, "")
             )
-
-        for tag, value in self.file_reader.metadata.items():
+        # Other (non-editable) fields
+        for tag, value in file_reader.metadata.items():
             if tag not in TAGS:
-                self.tags[tag] = TagData.from_metadata_not_interactive(value)
+                tags[tag] = TagData.from_metadata_not_interactive(value)
+        return tags
 
-    def build_form(self) -> None:
-        """Create the form from the tags."""
+    def build_form(
+        self,
+    ) -> tuple[QtWidgets.QFormLayout, dict[str, QtWidgets.QPushButton]]:
+        """Return the form created from the tags, and the Save/Reset All buttons."""
+        form = QtWidgets.QFormLayout(self)
         # File name
         title = QtWidgets.QLabel(Path(self.file_path).name)
         title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         title.setFont(QtGui.QFont("Sans Serif", 14))
-        self.form.addRow(title)
+        form.addRow(title)
         # Empty space
-        self.form.addRow(QtWidgets.QLabel())
-        # Path
+        form.addRow(QtWidgets.QLabel())
+        # File Path
         path_field = QtWidgets.QLineEdit(str(self.file_path))
         path_field.setEnabled(False)
-        self.form.addRow("Path", path_field)
+        form.addRow("Path", path_field)
         # Editable fields
         for tag in TAGS:
             row_layout = QtWidgets.QHBoxLayout()
             row_layout.addWidget(self.tags[tag].line_edit)
             row_layout.addWidget(self.tags[tag].reset_button)
-            self.form.addRow(tag[1:], row_layout)
-        # Other fields
+            form.addRow(tag[1:], row_layout)
+        # Other (non-editable) fields
         for tag, data in self.tags.items():
             if not data.interactive:
-                self.form.addRow(tag[1:], data.line_edit)
+                form.addRow(tag[1:], data.line_edit)
         # Empty space
-        self.form.addRow(QtWidgets.QLabel())
-        # Save/Reset buttons
-        buttons_layout = QtWidgets.QHBoxLayout()
+        form.addRow(QtWidgets.QLabel())
+        # Save button
         save_button = QtWidgets.QPushButton("Save")
-        reset_button = QtWidgets.QPushButton("Reset All")
         save_button.clicked.connect(self.save_file)
+        # Reset All button
+        reset_button = QtWidgets.QPushButton("Reset All")
         for data in self.tags.values():
             reset_button.clicked.connect(data.reset_function)
+        # Align save/reset button horizontally
+        buttons_layout = QtWidgets.QHBoxLayout()
         buttons_layout.addWidget(save_button)
         buttons_layout.addWidget(reset_button)
-        self.other_interactive_widgets["save"] = save_button
-        self.other_interactive_widgets["reset"] = reset_button
-        self.form.addRow(buttons_layout)
+        form.addRow(buttons_layout)
+        # Return the form and the save/reset buttons
+        other_interactive_widgets = {"save": save_button, "reset": reset_button}
+        return form, other_interactive_widgets
 
     def save_file(self) -> None:
-        """Save the file."""
+        """If there was any change in metadata, save the changes.
+
+        This is the slot connected to the Save button.
+        The resulting file path is the ``file_path`` attribute.
+        If the ``backup`` attribute is set to True, the existing file at ``file_path`` (if any)
+        is renamed to back it up."""
         if all(not data.modified for data in self.tags.values()):
             return
         for data in self.tags.values():
             data.save_function()
         if self.backup:
             self.create_file_backup(self.file_path)
+        # Note: PdfWriter initialises the "/Producer" metadata with "PyPDF2".
         file_writer = PyPDF2.PdfWriter()
         file_writer.clone_reader_document_root(self.file_reader)
         file_writer.add_metadata(
@@ -238,8 +294,16 @@ class MetadataPanel(QtWidgets.QWidget):
     def create_file_backup(self, file_path: str) -> None:
         """Rename the file for backup purposes.
 
-        If a file already exist with the backup name,
-        keep trying with an increasing counter."""
+        The file is renamed by adding a .bak extension.
+        If such file already exists, it is renamed by appending .bak1,
+        .bak2, and so on, until an available file name is found.
+        If the file to rename does not exist, display a warning message.
+
+        Parameters
+        ----------
+        file_path : str
+            The path of the file to back up.
+        """
 
         i = 0
         while True:
