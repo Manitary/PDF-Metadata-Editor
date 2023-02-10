@@ -21,17 +21,6 @@ BG_DEFAULT = QtCore.Qt.GlobalColor.white
 BG_HIGHLIGHT = QtCore.Qt.GlobalColor.red
 
 
-def change_widget_background_colour(
-    widget: QtWidgets.QWidget, colour: QtCore.Qt.GlobalColor
-) -> None:
-    """Change a widget background colour with the assigned colour.
-
-    At the moment only works for PyQt pre-set colours."""
-    palette = QtGui.QPalette()
-    palette.setColor(QtGui.QPalette.ColorRole.Base, QtGui.QColor(colour))
-    widget.setPalette(palette)
-
-
 @dataclass
 class TagData:
     """Tag value and associated widgets"""
@@ -57,15 +46,15 @@ class TagData:
         def save_function() -> None:
             tag.modified = False
             tag.value = line_edit.text()
-            change_widget_background_colour(line_edit, BG_DEFAULT)
+            TagData.change_widget_background_colour(line_edit, BG_DEFAULT)
 
         def edit_function() -> None:
             if line_edit.text() == value:
                 tag.modified = False
-                change_widget_background_colour(line_edit, BG_DEFAULT)
+                TagData.change_widget_background_colour(line_edit, BG_DEFAULT)
             else:
                 tag.modified = True
-                change_widget_background_colour(line_edit, BG_HIGHLIGHT)
+                TagData.change_widget_background_colour(line_edit, BG_HIGHLIGHT)
 
         line_edit.textChanged.connect(edit_function)
         reset_button.clicked.connect(reset_function)
@@ -83,6 +72,17 @@ class TagData:
         line_edit = QtWidgets.QLineEdit(str(value))
         line_edit.setEnabled(False)
         return TagData(value=value, line_edit=line_edit)
+
+    @staticmethod
+    def change_widget_background_colour(
+        widget: QtWidgets.QWidget, colour: QtCore.Qt.GlobalColor
+    ) -> None:
+        """Change a widget background colour with the assigned colour.
+
+        At the moment only works for PyQt pre-set colours."""
+        palette = QtGui.QPalette()
+        palette.setColor(QtGui.QPalette.ColorRole.Base, QtGui.QColor(colour))
+        widget.setPalette(palette)
 
 
 class MetadataPanel(QtWidgets.QWidget):
