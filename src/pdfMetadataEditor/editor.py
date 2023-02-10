@@ -1,4 +1,16 @@
-"""This module provides a GUI to intuitively edit the metadata of a PDF"""
+"""This module provides a GUI to intuitively edit the metadata of a PDF.
+
+Methods
+-------
+    main : Launch the GUI.
+
+Classes
+-------
+    MainWindow : Handle the main window of the application.
+    MetadataPanel : Handle the central widget of the main window.
+        It is effectively the interface through which the user modifies the metadata.
+    TagData : Contain all the objects related to a metadata field:
+        its value, the GUI elements to modify it, the associated signals."""
 
 from __future__ import annotations
 import os
@@ -23,7 +35,34 @@ BG_HIGHLIGHT = QtCore.Qt.GlobalColor.red
 
 @dataclass
 class TagData:
-    """Tag value and associated widgets"""
+    """A class that handles the objects associated to a tag.
+
+    Attributes
+    ----------
+    value : str
+        The metadata value.
+    line_edit : QLineEdit
+        The widget to display and modify the value.
+    reset_button : QPushButton
+        The button to reset the QLineEdit text.
+    reset_function : Callable
+        The slot called when ``reset_button`` is pressed.
+    save_function : Callable
+        The function called to save the ``line_edit`` text as new ``value``.
+    modified : bool
+        True if the ``line_edit`` text differs from ``value``.
+    interactive : bool
+        True if the ``line_edit`` text can be edited by the user.
+
+    Methods
+    -------
+    from_metadata_interactive(value="")
+        Create a TagData object with the given value and an interactive ``line_edit``.
+    from_metadata_not_interactive(value="")
+        Create a TagData object with the given value and a non-interactive ``line_edit``.
+    change_widget_background_colour(widget, colour)
+        Change the background colour of ``widget`` to ``colour``.
+    """
 
     value: str = ""
     line_edit: QtWidgets.QLineEdit = None
@@ -35,20 +74,36 @@ class TagData:
 
     @classmethod
     def from_metadata_interactive(cls, value: str = "") -> TagData:
-        """Create tag object from an interactive tag."""
+        """Create a TagData object with an interactive ``line_edit``.
+
+        Parameters
+        ----------
+        value : str
+            The value of the metadata.
+        """
         tag = TagData(value=str(value))
         line_edit = QtWidgets.QLineEdit(value)
         reset_button = QtWidgets.QPushButton("Reset")
 
         def reset_function() -> None:
+            """Reset the text of ``line_edit`` to ``value``.
+
+            It is the slot called when reset_button is pressed."""
             line_edit.setText(tag.value)
 
         def save_function() -> None:
+            """Set ``value`` to the text of ``line_edit``.
+
+            Additionally, set ``modified`` to False, and reset ``line_edit`` background colour.
+            It is called when the "Save" button is pressed."""
             tag.modified = False
             tag.value = line_edit.text()
             TagData.change_widget_background_colour(line_edit, BG_DEFAULT)
 
         def edit_function() -> None:
+            """Update ``modified`` and ``line_edit`` background colour based on its text.
+
+            It is the slot called when ``line_edit`` text is changed."""
             if line_edit.text() == value:
                 tag.modified = False
                 TagData.change_widget_background_colour(line_edit, BG_DEFAULT)
@@ -68,7 +123,13 @@ class TagData:
 
     @classmethod
     def from_metadata_not_interactive(cls, value: str = "") -> TagData:
-        """Create tag object from a non-interactive tag."""
+        """Create a TagData object with an non-interactive ``line_edit``.
+
+        Parameters
+        ----------
+        value : str
+            The value of the metadata.
+        """
         line_edit = QtWidgets.QLineEdit(str(value))
         line_edit.setEnabled(False)
         return TagData(value=value, line_edit=line_edit)
@@ -77,9 +138,18 @@ class TagData:
     def change_widget_background_colour(
         widget: QtWidgets.QWidget, colour: QtCore.Qt.GlobalColor
     ) -> None:
-        """Change a widget background colour with the assigned colour.
+        """Change a widget background colour to the assigned colour.
 
-        At the moment only works for PyQt pre-set colours."""
+        Currently only accepts PyQt pre-set colours.
+
+        Parameters
+        ----------
+        widget : QWidget
+            The widget to modify.
+        colour : GlobalColor
+            A PyQt pre-set colour.
+            See complete list at https://doc.qt.io/qt-6/qt.html#GlobalColor-enum.
+        """
         palette = QtGui.QPalette()
         palette.setColor(QtGui.QPalette.ColorRole.Base, QtGui.QColor(colour))
         widget.setPalette(palette)
