@@ -7,14 +7,15 @@ import PyPDF2
 import pytest
 from pytestqt.qtbot import QtBot
 from PyQt6 import QtWidgets, QtCore
-from pdfMetadataEditor import editor
+from pdfMetadataEditor import MainWindow
+from pdfMetadataEditor.editor import TAGS
 
 PASSWORD = "asdfzxcv"
 PASSWORD_BOTH = "foo"
 
 
 def test_open_not_pdf(
-    window: editor.MainWindow,
+    window: MainWindow,
     not_pdf: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -28,7 +29,7 @@ def test_open_not_pdf(
     assert file_reader is None
 
 
-def test_open_unencrypted_pdf(window: editor.MainWindow, base_pdf: Path) -> None:
+def test_open_unencrypted_pdf(window: MainWindow, base_pdf: Path) -> None:
     """Open a trivial pdf file."""
     file_reader = window.open_file(base_pdf)
     assert file_reader.metadata
@@ -36,7 +37,7 @@ def test_open_unencrypted_pdf(window: editor.MainWindow, base_pdf: Path) -> None
 
 
 def test_open_encrypted_pdf_correct_password(
-    window: editor.MainWindow, encrypted_pdf_both: Path, monkeypatch: pytest.MonkeyPatch
+    window: MainWindow, encrypted_pdf_both: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Open an encrypted pdf file."""
     monkeypatch.setattr(
@@ -49,7 +50,7 @@ def test_open_encrypted_pdf_correct_password(
 
 
 def test_open_encrypted_pdf_wrong_then_correct_password(
-    window: editor.MainWindow, encrypted_pdf_both: Path, monkeypatch: pytest.MonkeyPatch
+    window: MainWindow, encrypted_pdf_both: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Use the wrong password and then the correct password to open an encrypted file."""
     mock = Mock(side_effect=[("wrong_password", True), (PASSWORD_BOTH, True)])
@@ -62,7 +63,7 @@ def test_open_encrypted_pdf_wrong_then_correct_password(
 
 
 def test_dont_open_encrypted_pdf(
-    window: editor.MainWindow, encrypted_pdf_both: Path, monkeypatch: pytest.MonkeyPatch
+    window: MainWindow, encrypted_pdf_both: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Fail to open an encrypted pdf file by not submitting a password."""
     monkeypatch.setattr(QtWidgets.QInputDialog, "getText", lambda *args: ("", False))
@@ -71,7 +72,7 @@ def test_dont_open_encrypted_pdf(
     assert file_reader is None
 
 
-def test_save_file_no_actions(window: editor.MainWindow, base_pdf: Path) -> None:
+def test_save_file_no_actions(window: MainWindow, base_pdf: Path) -> None:
     """Don't do anything when opening and saving a file."""
     expected = base_pdf.read_bytes()
     file_name = base_pdf.name
@@ -88,7 +89,7 @@ def test_save_file_no_actions(window: editor.MainWindow, base_pdf: Path) -> None
 
 
 def test_save_file_after_deleted_original(
-    window: editor.MainWindow, base_pdf: Path, monkeypatch: pytest.MonkeyPatch
+    window: MainWindow, base_pdf: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Don't create a backup if the original file was deleted."""
     monkeypatch.setattr(QtWidgets.QMessageBox, "warning", lambda *args: None)
@@ -109,9 +110,9 @@ def test_save_file_after_deleted_original(
     assert (dir_path / file_name).read_bytes() != original_bytes
 
 
-@pytest.mark.parametrize("tag", editor.TAGS)
+@pytest.mark.parametrize("tag", TAGS)
 def test_save_file_after_one_edit_reset(
-    qtbot: QtBot, window: editor.MainWindow, base_pdf: Path, tag: str
+    qtbot: QtBot, window: MainWindow, base_pdf: Path, tag: str
 ) -> None:
     """A metadata field is edited and then reset using its reset button.
 
@@ -132,9 +133,9 @@ def test_save_file_after_one_edit_reset(
     assert (dir_path / file_name).read_bytes() == expected
 
 
-@pytest.mark.parametrize("tag", editor.TAGS)
+@pytest.mark.parametrize("tag", TAGS)
 def test_save_file_after_one_edit_reverted(
-    qtbot: QtBot, window: editor.MainWindow, base_pdf: Path, tag: str
+    qtbot: QtBot, window: MainWindow, base_pdf: Path, tag: str
 ) -> None:
     """A metadata field is edited and then manually reverted.
 
@@ -159,14 +160,14 @@ def test_save_file_after_one_edit_reverted(
 
 
 def test_save_file_after_all_edit_reset(
-    qtbot: QtBot, window: editor.MainWindow, base_pdf: Path
+    qtbot: QtBot, window: MainWindow, base_pdf: Path
 ) -> None:
     """All metadata fields are edited and reset using the Reset All button."""
     expected = base_pdf.read_bytes()
     file_name = base_pdf.name
     dir_path = base_pdf.parent
     window.display_metadata(base_pdf)
-    for tag in editor.TAGS:
+    for tag in TAGS:
         qtbot.keyPress(window.central_widget.tags[tag].line_edit, "a")
     window.central_widget.other_interactive_widgets["reset"].click()
     window.central_widget.save_file()
@@ -179,9 +180,9 @@ def test_save_file_after_all_edit_reset(
     assert (dir_path / file_name).read_bytes() == expected
 
 
-@pytest.mark.parametrize("tag", editor.TAGS)
+@pytest.mark.parametrize("tag", TAGS)
 def test_save_file_after_field_edit(
-    qtbot: QtBot, window: editor.MainWindow, base_pdf: Path, tag: str
+    qtbot: QtBot, window: MainWindow, base_pdf: Path, tag: str
 ) -> None:
     """A metadata field is edited and changes are saved."""
     original_bytes = base_pdf.read_bytes()
@@ -212,9 +213,7 @@ def test_save_file_after_field_edit(
     assert new_reader.metadata[tag] == original_reader.metadata.get(tag, "") + "a"
 
 
-def test_modify_file_twice(
-    qtbot: QtBot, window: editor.MainWindow, base_pdf: Path
-) -> None:
+def test_modify_file_twice(qtbot: QtBot, window: MainWindow, base_pdf: Path) -> None:
     """The same file is modified and saved more than once.
 
     Test creation of backup files with overlapping names."""

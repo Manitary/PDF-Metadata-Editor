@@ -1,4 +1,4 @@
-"""New version"""
+"""This module provides a GUI to intuitively edit the metadata of a PDF"""
 
 from __future__ import annotations
 import os
@@ -10,9 +10,9 @@ from collections import defaultdict
 import PyPDF2
 from PyQt6 import QtWidgets, QtGui, QtCore
 from PyPDF2.errors import PdfReadError
+from ._version import __version__
 
 APPLICATION_NAME = "PDF Metadata Editor"
-VERSION = 0.2
 URL_GITHUB = "https://github.com/Manitary/PDF-Metadata-Editor"
 
 TAGS = ["/Title", "/Author", "/Subject", "/Keywords", "/Producer", "/Creator"]
@@ -234,7 +234,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self,
             "About",
             f"""
-            <p>PDF Metadata Editor v{VERSION}</p>
+            <p>PDF Metadata Editor v{__version__}</p>
 
             Source code available on <a href="{URL_GITHUB}">GitHub</a>
             """,
