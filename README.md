@@ -2,7 +2,7 @@
 
 A GUI to edit the metadata of a PDF in an intuitive way, without going through the command line.
 
-The GUI is created using [PyQt6][pyqt]; the operations of reading/writing PDF files are performed via [PyPDF2][pypdf].
+The GUI is created using [PyQt6][pyqt]; the operations of reading/writing PDF files are performed via [pypdf][pypdf].
 
 Files can be selected through the menu, or by dragging and dropping onto the main window.
 

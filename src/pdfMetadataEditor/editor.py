@@ -19,9 +19,9 @@ from pathlib import Path
 from typing import Callable, Optional
 from dataclasses import dataclass
 from collections import defaultdict
-import PyPDF2
+import pypdf
 from PyQt6 import QtWidgets, QtGui, QtCore
-from PyPDF2.errors import PdfReadError
+from pypdf.errors import PdfReadError
 from ._version import __version__
 
 APPLICATION_NAME = "PDF Metadata Editor"
@@ -187,7 +187,7 @@ class MetadataPanel(QtWidgets.QWidget):
         If any metadata field was edited, save the changes into a new file with path ``file_path``.
     """
 
-    def __init__(self, file_reader: PyPDF2.PdfReader, file_path: str) -> None:
+    def __init__(self, file_reader: pypdf.PdfReader, file_path: str) -> None:
         """Create the widget from a PdfReader object.
 
         Parameters
@@ -205,7 +205,7 @@ class MetadataPanel(QtWidgets.QWidget):
         self.form, self.other_interactive_widgets = self.build_form()
 
     @staticmethod
-    def create_tags(file_reader: PyPDF2.PdfReader) -> dict[str, TagData]:
+    def create_tags(file_reader: pypdf.PdfReader) -> dict[str, TagData]:
         """Return the tag -> TagData dictionary based on the file_reader metadata.
 
         Parameters
@@ -282,8 +282,8 @@ class MetadataPanel(QtWidgets.QWidget):
             data.save_function()
         if self.backup:
             self.create_file_backup(self.file_path)
-        # Note: PdfWriter initialises the "/Producer" metadata with "PyPDF2".
-        file_writer = PyPDF2.PdfWriter()
+        # Note: PdfWriter initialises the "/Producer" metadata with "pypdf".
+        file_writer = pypdf.PdfWriter()
         file_writer.clone_reader_document_root(self.file_reader)
         file_writer.add_metadata(
             {tag: data.value for tag, data in self.tags.items() if data.value}
@@ -358,7 +358,7 @@ class MainWindow(QtWidgets.QMainWindow):
         Return the PdfReader object of the file at ``file_path``, if possible.
         Include handling the decryption of password-protected files.
         Display an error message in case of failed decryption or if the file cannot be opened.
-        Display a warning message if the file cannot be read in strict mode, asking for confirmation.
+        Display a warning message if the file cannot be read in strict mode.
     """
 
     def __init__(self, *args, **kwargs) -> None:
@@ -478,7 +478,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for url in event.mimeData().urls():
             self.display_metadata(url.toLocalFile())
 
-    def open_file(self, file_path: str) -> Optional[PyPDF2.PdfReader]:
+    def open_file(self, file_path: str) -> Optional[pypdf.PdfReader]:
         """Return the PdfReader object for the file at ``file_path``, if possible.
 
         If the file cannot be opened (e.g. not a PDF file), display an error message.
@@ -487,8 +487,8 @@ class MainWindow(QtWidgets.QMainWindow):
         Display an error message in case of incorrect password.
         If the file cannot be opened in strict mode, i.e. it does not follows 1.7 specifications,
         display a warning message asking the user whether to proceed.
-        For more information about PyPDF2 strict mode, see
-        https://pypdf2.readthedocs.io/en/latest/user/robustness.html.
+        For more information about pypdf strict mode, see
+        https://pypdf.readthedocs.io/en/latest/user/robustness.html.
 
         Parameters
         ----------
@@ -497,7 +497,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         # Catch files that cannot be read (e.g. non-pdf files).
         try:
-            file_reader = PyPDF2.PdfReader(file_path)
+            file_reader = pypdf.PdfReader(file_path)
         except PdfReadError:
             QtWidgets.QMessageBox.critical(
                 self, "Error", "The file could not be opened"
@@ -522,7 +522,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     QtWidgets.QMessageBox.critical(self, "Error", "Incorrect password")
         # Robustness check. Ask confirmation from the user to continue.
         try:
-            file_reader_robust = PyPDF2.PdfReader(
+            file_reader_robust = pypdf.PdfReader(
                 file_path,
                 strict=True,
                 password=password if file_reader.is_encrypted else None,

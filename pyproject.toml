@@ -19,7 +19,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-dependencies = ["PyQt6", "PyPDF2", "PyPDF2[crypto]"]
+dependencies = ["PyQt6", "pypdf", "pypdf[crypto]"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 from unittest.mock import Mock
-import PyPDF2
+import pypdf
 import pytest
 from pytestqt.qtbot import QtBot
 from PyQt6 import QtWidgets, QtCore
@@ -189,11 +189,11 @@ def test_save_file_after_field_edit(
     file_name = base_pdf.name
     backup_name = file_name + ".bak"
     dir_path = base_pdf.parent
-    original_reader = PyPDF2.PdfReader(base_pdf)
+    original_reader = pypdf.PdfReader(base_pdf)
     window.display_metadata(base_pdf)
     qtbot.keyPress(window.central_widget.tags[tag].line_edit, "a")
     window.central_widget.save_file()
-    new_reader = PyPDF2.PdfReader(dir_path / file_name)
+    new_reader = pypdf.PdfReader(dir_path / file_name)
     files = os.listdir(dir_path)
     # One new file is created
     assert len(files) == 2
@@ -236,10 +236,10 @@ def test_modify_file_twice(qtbot: QtBot, window: MainWindow, base_pdf: Path) -> 
     # The older backup file has the same contents as the original file
     assert (dir_path / backup_name).read_bytes() == original_bytes
     # Each file has the expected change in the given metadata field
-    assert PyPDF2.PdfReader(dir_path / backup_name).metadata.get(
+    assert pypdf.PdfReader(dir_path / backup_name).metadata.get(
         tag, ""
-    ) + "a" == PyPDF2.PdfReader(dir_path / backup_name_1).metadata.get(tag, "")
+    ) + "a" == pypdf.PdfReader(dir_path / backup_name_1).metadata.get(tag, "")
     assert (
-        PyPDF2.PdfReader(dir_path / backup_name_1).metadata[tag] + "a"
-        == PyPDF2.PdfReader(dir_path / file_name).metadata[tag]
+        pypdf.PdfReader(dir_path / backup_name_1).metadata[tag] + "a"
+        == pypdf.PdfReader(dir_path / file_name).metadata[tag]
     )
