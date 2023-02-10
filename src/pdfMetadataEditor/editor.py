@@ -57,9 +57,9 @@ class TagData:
     Methods
     -------
     from_metadata_interactive(value="")
-        Create and return a TagData object with the given value and an interactive ``line_edit``.
+        Return a TagData object with the given value and an interactive ``line_edit``.
     from_metadata_not_interactive(value="")
-        Create and return a TagData object with the given value and a non-interactive ``line_edit``.
+        Return a TagData object with the given value and a non-interactive ``line_edit``.
     change_widget_background_colour(widget, colour)
         Change the background colour of ``widget`` to ``colour``.
     """
@@ -327,21 +327,62 @@ class MetadataPanel(QtWidgets.QWidget):
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    """Instance of the actual GUI."""
+    """A class that handles the instance of the actual GUI.
+
+    Attributes
+    ----------
+    actions : dict[str, QAction]
+        A dictionary to easily access the actions used in the menu.
+    central_widget : QWidget
+        The interface to edit metadata.
+
+    Methods
+    -------
+    create_actions()
+        Return the actions to use in the menu.
+    create_menu()
+        Create the menu.
+    show_about()
+        Display the "About" information. It is connected to the "About" menu action.
+    display_metadata(file_path)
+        Create the interface to display and edit the metadata of the file at ``file_path``.
+    select_file()
+        Open the file selection window.
+    dragEnterEvent()
+        Handle dragging items on the main window.
+        Reimplement the method inherited from QMainWindow.
+    dropEvent()
+        Handle dropping items on the main window.
+        Reimplement the method inherited from QMainWindow.
+    open_file(file_path)
+        Return the PdfReader object of the file at ``file_path``, if possible.
+        Include handling the decryption of password-protected files.
+        Display an error message in case of failed decryption or if the file cannot be opened.
+        Display a warning message if the file cannot be read in strict mode, asking for confirmation.
+    """
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.setWindowTitle(APPLICATION_NAME)
         self.setGeometry(400, 400, 500, 500)
-        self.actions = {}
-        self.create_actions()
+        self.actions = self.create_actions()
         self.create_menu()
         self.central_widget = QtWidgets.QWidget()
         self.setAcceptDrops(True)
         self.show()
 
-    def create_actions(self) -> None:
-        """Create the menu actions."""
+    def create_actions(self) -> dict[str, QtGui.QAction]:
+        """Return a dictionary of menu actions.
+
+        Actions
+        -------
+        open: open the file selection panel.
+            Connected to the ``select_file`` method.
+        close: close the program.
+            Connected to the ``close`` method (inherited from QMainWindow).
+        about: show the "About" message.
+            Connected to the ``show_about`` method.
+        """
         open_action = QtGui.QAction("Open")
         open_action.triggered.connect(self.select_file)
         open_action.setShortcut(QtGui.QKeySequence.StandardKey.Open)
@@ -349,12 +390,24 @@ class MainWindow(QtWidgets.QMainWindow):
         quit_action.triggered.connect(self.close)
         about_action = QtGui.QAction("About")
         about_action.triggered.connect(self.show_about)
-        self.actions["open"] = open_action
-        self.actions["quit"] = quit_action
-        self.actions["about"] = about_action
+        actions = {
+            "open": open_action,
+            "quit": quit_action,
+            "about": about_action,
+        }
+        return actions
 
     def create_menu(self) -> None:
-        """Menu creation."""
+        """Create the menu.
+
+        Menu
+        ----
+        File
+            Open (ctrl-O)
+            Quit
+        Help
+            About
+        """
         self.menuBar().setNativeMenuBar(False)
         file_menu = self.menuBar().addMenu("File")
         help_menu = self.menuBar().addMenu("Help")
@@ -363,19 +416,25 @@ class MainWindow(QtWidgets.QMainWindow):
         help_menu.addAction(self.actions["about"])
 
     def show_about(self) -> None:
-        """Display "About" information."""
+        """Display the "About" information."""
         QtWidgets.QMessageBox.about(
             self,
             "About",
-            f"""
-            <p>PDF Metadata Editor v{__version__}</p>
-
-            Source code available on <a href="{URL_GITHUB}">GitHub</a>
-            """,
+            (
+                f"{APPLICATION_NAME} v{__version__}"
+                "<p>"
+                f'Source code available on <a href="{URL_GITHUB}">GitHub</a>'
+            ),
         )
 
     def display_metadata(self, file_path: str) -> None:
-        """Create the GUI for the given file path, if possible."""
+        """Create the interface to edit metadata and attach it to the central widget of the window.
+
+        Parameters
+        ----------
+        file_path : str
+            The path of the file whose metadata will be displayed for editing.
+        """
         if file_path:
             file_object = self.open_file(file_path)
             if file_object is not None:
@@ -386,7 +445,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """Handle file selection.
 
         Open a standard file selection window, with .pdf extension as default filter.
-        If the user selects a file, set it as current file, and open it in the current session.
+        If the user selects a file, open it in the current session.
         """
         # getOpenFileName returns a tuple of strings (path, filter)
         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -400,7 +459,13 @@ class MainWindow(QtWidgets.QMainWindow):
     # Reimplement dragEnterEvent class method
     # pylint:disable-next=invalid-name
     def dragEnterEvent(self, event: QtGui.QDragEnterEvent) -> None:
-        """Only accept drag events for certain data."""
+        """Only accept drag events for certain data.
+
+        Parameters
+        ----------
+        event : QDragEnterEvent
+        """
+        # hasUrls is true when dragging files because of their path.
         if event.mimeData().hasUrls:
             event.accept()
         else:
@@ -411,14 +476,25 @@ class MainWindow(QtWidgets.QMainWindow):
     def dropEvent(self, event: QtGui.QDropEvent) -> None:
         """Attempt to open the file dropped onto the window."""
         for url in event.mimeData().urls():
-            self.display_metadata(str(url.toLocalFile()))
+            self.display_metadata(url.toLocalFile())
 
-    def open_file(self, file_path: str) -> PyPDF2.PdfReader:
-        """Return the PdfReader object for the current file, if possible.
+    def open_file(self, file_path: str) -> Optional[PyPDF2.PdfReader]:
+        """Return the PdfReader object for the file at ``file_path``, if possible.
 
+        If the file cannot be opened (e.g. not a PDF file), display an error message.
         If the file is password-protected, prompt the user to insert the password
-        until either the correct password is provided or the 'cancel' button is pressed.
-        Display an error message in case of incorrect password or if the file cannot be opened."""
+        until either the correct password is provided or the 'Cancel' button is pressed.
+        Display an error message in case of incorrect password.
+        If the file cannot be opened in strict mode, i.e. it does not follows 1.7 specifications,
+        display a warning message asking the user whether to proceed.
+        For more information about PyPDF2 strict mode, see
+        https://pypdf2.readthedocs.io/en/latest/user/robustness.html.
+
+        Parameters
+        ----------
+        file_path : str
+            The file path to read.
+        """
         # Catch files that cannot be read (e.g. non-pdf files).
         try:
             file_reader = PyPDF2.PdfReader(file_path)
@@ -427,6 +503,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self, "Error", "The file could not be opened"
             )
             return None
+        # If the file is password-protected, prompt the user to insert the password.
         if file_reader.is_encrypted:
             decrypted = None
             while not decrypted:
@@ -443,14 +520,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 # Display an error message if the password is incorrect.
                 if not decrypted:
                     QtWidgets.QMessageBox.critical(self, "Error", "Incorrect password")
-        # Robustness check, ask confirmation from the user to continue.
+        # Robustness check. Ask confirmation from the user to continue.
         try:
             file_reader_robust = PyPDF2.PdfReader(
                 file_path,
                 strict=True,
                 password=password if file_reader.is_encrypted else None,
             )
-            assert file_reader_robust.metadata
+            assert file_reader_robust.metadata is not None
         except PdfReadError:
             answer = QtWidgets.QMessageBox.question(
                 self,
@@ -466,6 +543,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 | QtWidgets.QMessageBox.StandardButton.No,
                 QtWidgets.QMessageBox.StandardButton.No,
             )
+            # Do nothing unless the user chooses to proceed.
             if answer != QtWidgets.QMessageBox.StandardButton.Yes:
                 return None
         except AssertionError:
@@ -475,7 +553,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 def main() -> None:
-    """Main loop."""
+    """The application main loop."""
     app = QtWidgets.QApplication(sys.argv)
     # The window must be assigned to an object
     # pylint: disable-next=unused-variable
