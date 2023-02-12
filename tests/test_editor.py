@@ -198,7 +198,7 @@ def test_save_file_after_field_edit(
     # One new file is created
     assert len(files) == 2
     # The two files have the original and backup name
-    assert files == [file_name, backup_name]
+    assert set(files) == {file_name, backup_name}
     # The backup file has the same contents as the original file
     assert (dir_path / backup_name).read_bytes() == original_bytes
     # The new file contents are different
