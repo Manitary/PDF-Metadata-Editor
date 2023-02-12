@@ -305,25 +305,25 @@ class MetadataPanel(QtWidgets.QWidget):
             The path of the file to back up.
         """
 
+        def new_file_name(i: int) -> str:
+            return f"{file_path}.bak{i if i else ''}"
+
         i = 0
-        while True:
-            try:
-                os.rename(file_path, f"{file_path}.bak{i if i else ''}")
-            except FileExistsError:
-                i += 1
-            except FileNotFoundError:
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "Missing file",
-                    (
-                        "The backup file was not created."
-                        "<p>"
-                        "The original file may have been renamed, moved, or deleted."
-                    ),
-                )
-                return
-            else:
-                return
+        # On Unix systems, os.rename does not raise exceptions if the destination already exists.
+        while os.path.isfile(new_file_name(i)):
+            i += 1
+        try:
+            os.rename(file_path, new_file_name(i))
+        except FileNotFoundError:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Missing file",
+                (
+                    "The backup file was not created."
+                    "<p>"
+                    "The original file may have been renamed, moved, or deleted."
+                ),
+            )
 
 
 class MainWindow(QtWidgets.QMainWindow):
