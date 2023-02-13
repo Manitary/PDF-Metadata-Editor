@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "PDFMetadataEditor"
-version = "0.1.1"
+version = "0.2"
 authors = [
   { name="Andrea Pachera" },
   { name="Gianmarco Brocchi", email="gianmarcobrocchi@gmail.com" },
@@ -19,7 +19,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-dependencies = ["PyQt6", "PyPDF2", "PyPDF2[crypto]"]
+dependencies = ["PyQt6", "pypdf", "pypdf[crypto]"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -28,4 +28,4 @@ package-dir = {"" = "src"}
 "Homepage" = "https://github.com/Manitary/PDF-Metadata-Editor"
 
 [project.gui-scripts]
-pdf-metadata-editor = "pdfMetadataEditor.pdfMetadataEditor:main"
+pdf-metadata-editor = "pdfMetadataEditor.editor:main"
