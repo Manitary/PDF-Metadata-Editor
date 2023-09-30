@@ -2,16 +2,20 @@
 
 import os
 from pathlib import Path
+from typing import Callable
 from unittest.mock import Mock
+
 import pypdf
 import pytest
+from PyQt6 import QtCore, QtWidgets
 from pytestqt.qtbot import QtBot
-from PyQt6 import QtWidgets, QtCore
+
 from pdfMetadataEditor import MainWindow
-from pdfMetadataEditor.editor import TAGS
+from pdfMetadataEditor.editor import TAGS, MetadataPanel
 
 PASSWORD = "asdfzxcv"
 PASSWORD_BOTH = "foo"
+CLOSE_MESSAGE_BOX: Callable[..., None] = lambda *args: None
 
 
 def test_open_not_pdf(
@@ -20,11 +24,7 @@ def test_open_not_pdf(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Fail to open a non-pdf file."""
-    monkeypatch.setattr(
-        QtWidgets.QMessageBox,
-        "critical",
-        lambda *args: None,
-    )
+    monkeypatch.setattr(QtWidgets.QMessageBox, "critical", CLOSE_MESSAGE_BOX)
     file_reader = window.open_file(not_pdf)
     assert file_reader is None
 
@@ -32,6 +32,7 @@ def test_open_not_pdf(
 def test_open_unencrypted_pdf(window: MainWindow, base_pdf: Path) -> None:
     """Open a trivial pdf file."""
     file_reader = window.open_file(base_pdf)
+    assert file_reader
     assert file_reader.metadata
     # PdfReader metadata attribute is accessible if the document is not encrypted
 
@@ -40,11 +41,13 @@ def test_open_encrypted_pdf_correct_password(
     window: MainWindow, encrypted_pdf_both: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Open an encrypted pdf file."""
-    monkeypatch.setattr(
-        QtWidgets.QInputDialog, "getText", lambda *args: (PASSWORD_BOTH, True)
+    apply_correct_password: Callable[..., tuple[str, bool]] = lambda *args: (
+        PASSWORD_BOTH,
+        True,
     )
-    window.file_path = encrypted_pdf_both
-    file_reader = window.open_file(window.file_path)
+    monkeypatch.setattr(QtWidgets.QInputDialog, "getText", apply_correct_password)
+    file_reader = window.open_file(encrypted_pdf_both)
+    assert file_reader
     assert file_reader.metadata
     # PdfReader metadata attribute is accessible if the document is successfully decrypted.
 
@@ -55,9 +58,9 @@ def test_open_encrypted_pdf_wrong_then_correct_password(
     """Use the wrong password and then the correct password to open an encrypted file."""
     mock = Mock(side_effect=[("wrong_password", True), (PASSWORD_BOTH, True)])
     monkeypatch.setattr(QtWidgets.QInputDialog, "getText", mock)
-    monkeypatch.setattr(QtWidgets.QMessageBox, "critical", lambda *args: None)
-    window.file_path = encrypted_pdf_both
-    file_reader = window.open_file(window.file_path)
+    monkeypatch.setattr(QtWidgets.QMessageBox, "critical", CLOSE_MESSAGE_BOX)
+    file_reader = window.open_file(encrypted_pdf_both)
+    assert file_reader
     assert file_reader.metadata
     # PdfReader metadata attribute is accessible if the document is successfully decrypted.
 
@@ -66,9 +69,9 @@ def test_dont_open_encrypted_pdf(
     window: MainWindow, encrypted_pdf_both: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Fail to open an encrypted pdf file by not submitting a password."""
-    monkeypatch.setattr(QtWidgets.QInputDialog, "getText", lambda *args: ("", False))
-    window.file_path = encrypted_pdf_both
-    file_reader = window.open_file(window.file_path)
+    submit_no_password: Callable[..., tuple[str, bool]] = lambda *args: ("", False)
+    monkeypatch.setattr(QtWidgets.QInputDialog, "getText", submit_no_password)
+    file_reader = window.open_file(encrypted_pdf_both)
     assert file_reader is None
 
 
@@ -78,6 +81,7 @@ def test_save_file_no_actions(window: MainWindow, base_pdf: Path) -> None:
     file_name = base_pdf.name
     dir_path = base_pdf.parent
     window.display_metadata(base_pdf)
+    assert isinstance(window.central_widget, MetadataPanel)
     window.central_widget.save_file()
     files = os.listdir(dir_path)
     # No new file is created
@@ -89,17 +93,18 @@ def test_save_file_no_actions(window: MainWindow, base_pdf: Path) -> None:
 
 
 def test_save_file_after_deleted_original(
-    window: MainWindow, base_pdf: Path, monkeypatch: pytest.MonkeyPatch
+    qtbot: QtBot, window: MainWindow, base_pdf: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Don't create a backup if the original file was deleted."""
-    monkeypatch.setattr(QtWidgets.QMessageBox, "warning", lambda *args: None)
+    monkeypatch.setattr(QtWidgets.QMessageBox, "warning", CLOSE_MESSAGE_BOX)
     tag = "/Title"  # No need to parametrise this test
     original_bytes = base_pdf.read_bytes()
     file_name = base_pdf.name
     dir_path = base_pdf.parent
     window.display_metadata(base_pdf)
-    QtBot.keyPress(window.central_widget.tags[tag].line_edit, "a")
+    qtbot.keyPress(window.central_widget.tags_interactive[tag].line_edit, "a")
     os.remove(base_pdf)
+    assert isinstance(window.central_widget, MetadataPanel)
     window.central_widget.save_file()
     files = os.listdir(dir_path)
     # No backup file is created
@@ -121,8 +126,9 @@ def test_save_file_after_one_edit_reset(
     file_name = base_pdf.name
     dir_path = base_pdf.parent
     window.display_metadata(base_pdf)
-    qtbot.keyPress(window.central_widget.tags[tag].line_edit, "a")
-    window.central_widget.tags[tag].reset_button.click()
+    assert isinstance(window.central_widget, MetadataPanel)
+    qtbot.keyPress(window.central_widget.tags_interactive[tag].line_edit, "a")
+    window.central_widget.tags_interactive[tag].reset_button.click()
     window.central_widget.save_file()
     files = os.listdir(dir_path)
     # No new file is created
@@ -144,11 +150,13 @@ def test_save_file_after_one_edit_reverted(
     file_name = base_pdf.name
     dir_path = base_pdf.parent
     window.display_metadata(base_pdf)
-    qtbot.keyPress(window.central_widget.tags[tag].line_edit, "a")
+    assert isinstance(window.central_widget, MetadataPanel)
+    qtbot.keyPress(window.central_widget.tags_interactive[tag].line_edit, "a")
     qtbot.keyPress(
-        window.central_widget.tags[tag].line_edit, QtCore.Qt.Key.Key_Backspace
+        window.central_widget.tags_interactive[tag].line_edit,
+        QtCore.Qt.Key.Key_Backspace,
     )
-    window.central_widget.tags[tag].reset_button.click()
+    window.central_widget.tags_interactive[tag].reset_button.click()
     window.central_widget.save_file()
     files = os.listdir(dir_path)
     # No new file is created
@@ -167,8 +175,9 @@ def test_save_file_after_all_edit_reset(
     file_name = base_pdf.name
     dir_path = base_pdf.parent
     window.display_metadata(base_pdf)
+    assert isinstance(window.central_widget, MetadataPanel)
     for tag in TAGS:
-        qtbot.keyPress(window.central_widget.tags[tag].line_edit, "a")
+        qtbot.keyPress(window.central_widget.tags_interactive[tag].line_edit, "a")
     window.central_widget.other_interactive_widgets["reset"].click()
     window.central_widget.save_file()
     files = os.listdir(dir_path)
@@ -190,10 +199,14 @@ def test_save_file_after_field_edit(
     backup_name = file_name + ".bak"
     dir_path = base_pdf.parent
     original_reader = pypdf.PdfReader(base_pdf)
+    assert original_reader.metadata
+    original_metadata: dict[str, str] = dict(original_reader.metadata)
     window.display_metadata(base_pdf)
-    qtbot.keyPress(window.central_widget.tags[tag].line_edit, "a")
+    assert isinstance(window.central_widget, MetadataPanel)
+    qtbot.keyPress(window.central_widget.tags_interactive[tag].line_edit, "a")
     window.central_widget.save_file()
     new_reader = pypdf.PdfReader(dir_path / file_name)
+    assert new_reader.metadata
     files = os.listdir(dir_path)
     # One new file is created
     assert len(files) == 2
@@ -206,11 +219,11 @@ def test_save_file_after_field_edit(
     # All metadata except the specified one are unchanged
     assert all(
         value == new_reader.metadata[key]
-        for key, value in original_reader.metadata.items()
+        for key, value in original_metadata.items()
         if key != tag
     )
     # The specified metadata was edited correctly
-    assert new_reader.metadata[tag] == original_reader.metadata.get(tag, "") + "a"
+    assert new_reader.metadata[tag] == original_metadata.get(tag, "") + "a"
 
 
 def test_modify_file_twice(qtbot: QtBot, window: MainWindow, base_pdf: Path) -> None:
@@ -224,9 +237,10 @@ def test_modify_file_twice(qtbot: QtBot, window: MainWindow, base_pdf: Path) -> 
     backup_name_1 = file_name + ".bak1"
     dir_path = base_pdf.parent
     window.display_metadata(base_pdf)
-    qtbot.keyPress(window.central_widget.tags[tag].line_edit, "a")
+    assert isinstance(window.central_widget, MetadataPanel)
+    qtbot.keyPress(window.central_widget.tags_interactive[tag].line_edit, "a")
     window.central_widget.save_file()
-    qtbot.keyPress(window.central_widget.tags[tag].line_edit, "a")
+    qtbot.keyPress(window.central_widget.tags_interactive[tag].line_edit, "a")
     window.central_widget.save_file()
     files = os.listdir(dir_path)
     # Two new files are created
@@ -236,10 +250,17 @@ def test_modify_file_twice(qtbot: QtBot, window: MainWindow, base_pdf: Path) -> 
     # The older backup file has the same contents as the original file
     assert (dir_path / backup_name).read_bytes() == original_bytes
     # Each file has the expected change in the given metadata field
-    assert pypdf.PdfReader(dir_path / backup_name).metadata.get(
-        tag, ""
-    ) + "a" == pypdf.PdfReader(dir_path / backup_name_1).metadata.get(tag, "")
-    assert (
-        pypdf.PdfReader(dir_path / backup_name_1).metadata[tag] + "a"
-        == pypdf.PdfReader(dir_path / file_name).metadata[tag]
-    )
+    reader_backup = pypdf.PdfReader(dir_path / backup_name)
+    assert reader_backup.metadata
+    metadata_backup: dict[str, str] = dict(reader_backup.metadata)
+
+    reader_backup_1 = pypdf.PdfReader(dir_path / backup_name_1)
+    assert reader_backup_1.metadata
+    metadata_backup_1: dict[str, str] = dict(reader_backup_1.metadata)
+
+    reader_file = pypdf.PdfReader(dir_path / file_name)
+    assert reader_file.metadata
+    metadata_file: dict[str, str] = dict(reader_file.metadata)
+
+    assert metadata_backup.get(tag, "") + "a" == metadata_backup_1.get(tag, "")
+    assert metadata_backup_1.get(tag, "") + "a" == metadata_file.get(tag, "")

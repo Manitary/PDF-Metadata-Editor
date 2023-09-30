@@ -1,10 +1,12 @@
 """Fixtures."""
 
 import shutil
-from typing import Generator
 from pathlib import Path
+from typing import Generator
+
 import pytest
 from PyQt6 import QtWidgets
+
 from pdfMetadataEditor import editor
 
 TEST_ROOT = Path(__file__).parent.resolve()
