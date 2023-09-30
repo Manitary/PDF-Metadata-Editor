@@ -12,16 +12,16 @@ Classes
     TagData : Contain all the objects related to a metadata field:
         its value, the GUI elements to modify it, the associated signals."""
 
-from __future__ import annotations
+
 import os
 import sys
 from pathlib import Path
-from typing import Callable, Optional
-from dataclasses import dataclass
-from collections import defaultdict
+from typing import Any
+
 import pypdf
-from PyQt6 import QtWidgets, QtGui, QtCore
 from pypdf.errors import PdfReadError
+from PyQt6 import QtCore, QtGui, QtWidgets
+
 from ._version import __version__
 
 APPLICATION_NAME = "PDF Metadata Editor"
@@ -33,126 +33,138 @@ BG_DEFAULT = QtCore.Qt.GlobalColor.white
 BG_HIGHLIGHT = QtCore.Qt.GlobalColor.red
 
 
-@dataclass
 class TagData:
-    """A class that handles the objects associated to a tag.
+    """A class that handles the objects associated to a metadata tag.
 
     Attributes
     ----------
     value : str
         The metadata value.
     line_edit : QLineEdit
+        The widget to display the value.
+    """
+
+    def __init__(self, value: str) -> None:
+        self.value = value
+        self.line_edit = QtWidgets.QLineEdit(str(value))  # ? Why str conversion
+
+
+class TagDataNotInteractive(TagData):
+    """A TagData object where the QLineEdit widget is non-interactive.
+
+    Attributes
+    ----------
+    value : str
+        The metadata value.
+    line_edit : QLineEdit
+        The widget to display the value.
+    """
+
+    def __init__(self, value: str) -> None:
+        super().__init__(value)
+        self.line_edit.setEnabled(False)
+
+
+class TagDataInteractive(TagData):
+    """An interactive TagData object.
+
+    Attributes
+    ----------
+    value : ``str``
+        The metadata value.
+    line_edit : ``QLineEdit``
         The widget to display and modify the value.
-    reset_button : QPushButton
+    reset_button : ``QPushButton``
         The button to reset the QLineEdit text.
-    reset_function : Callable
+    reset_function : ``Callable[[], None]``
         The slot called when ``reset_button`` is pressed.
-    save_function : Callable
-        The function called to save the ``line_edit`` text as new ``value``.
-    modified : bool
+    modified : ``bool``
         True if the ``line_edit`` text differs from ``value``.
-    interactive : bool
-        True if the ``line_edit`` text can be edited by the user.
 
     Methods
     -------
-    from_metadata_interactive(value="")
-        Return a TagData object with the given value and an interactive ``line_edit``.
-    from_metadata_not_interactive(value="")
-        Return a TagData object with the given value and a non-interactive ``line_edit``.
-    change_widget_background_colour(widget, colour)
-        Change the background colour of ``widget`` to ``colour``.
+    save_changes : ``Callable[[], None]``
+        Save the ``line_edit`` text as new ``value``.
     """
 
-    value: str = ""
-    line_edit: QtWidgets.QLineEdit = None
-    reset_button: Optional[QtWidgets.QPushButton] = lambda: None
-    reset_function: Optional[Callable[[None], None]] = lambda: None
-    save_function: Optional[Callable[[None], None]] = lambda: None
-    modified: bool = False
-    interactive: bool = False
-
-    @classmethod
-    def from_metadata_interactive(cls, value: str = "") -> TagData:
-        """Create a TagData object with an interactive ``line_edit``.
-
-        Parameters
-        ----------
-        value : str
-            The value of the metadata.
-        """
-        tag = TagData(value=str(value))
-        line_edit = QtWidgets.QLineEdit(value)
-        reset_button = QtWidgets.QPushButton("Reset")
+    def __init__(self, value: str) -> None:
+        super().__init__(value)
+        self.line_edit.setEnabled(True)
+        self.modified = False
 
         def reset_function() -> None:
             """Reset the text of ``line_edit`` to ``value``.
 
             It is the slot called when reset_button is pressed."""
-            line_edit.setText(tag.value)
+            self.line_edit.setText(self.value)
 
-        def save_function() -> None:
-            """Set ``value`` to the text of ``line_edit``.
-
-            Additionally, set ``modified`` to False, and reset ``line_edit`` background colour.
-            It is called when the "Save" button is pressed."""
-            tag.modified = False
-            tag.value = line_edit.text()
-            TagData.change_widget_background_colour(line_edit, BG_DEFAULT)
+        self.reset_function = reset_function
+        self.reset_button = QtWidgets.QPushButton("Reset")
+        self.reset_button.clicked.connect(reset_function)
 
         def edit_function() -> None:
             """Update ``modified`` and ``line_edit`` background colour based on its text.
 
             It is the slot called when ``line_edit`` text is changed."""
-            if line_edit.text() == value:
-                tag.modified = False
-                TagData.change_widget_background_colour(line_edit, BG_DEFAULT)
+            if self.line_edit.text() == value:
+                self.modified = False
+                change_widget_background_colour(self.line_edit, BG_DEFAULT)
             else:
-                tag.modified = True
-                TagData.change_widget_background_colour(line_edit, BG_HIGHLIGHT)
+                self.modified = True
+                change_widget_background_colour(self.line_edit, BG_HIGHLIGHT)
 
-        line_edit.textChanged.connect(edit_function)
-        reset_button.clicked.connect(reset_function)
+        self.line_edit.textChanged.connect(edit_function)
 
-        tag.line_edit = line_edit
-        tag.reset_button = reset_button
-        tag.reset_function = reset_function
-        tag.save_function = save_function
-        tag.interactive = True
-        return tag
+    def save_changes(self) -> None:
+        """Set ``value`` to the text of ``line_edit``.
 
-    @classmethod
-    def from_metadata_not_interactive(cls, value: str = "") -> TagData:
-        """Create a TagData object with an non-interactive ``line_edit``.
+        Additionally, set ``modified`` to False, and reset ``line_edit`` background colour.
+        It is called when the "Save" button is pressed."""
+        self.modified = False
+        self.value = self.line_edit.text()
+        change_widget_background_colour(self.line_edit, BG_DEFAULT)
 
-        Parameters
-        ----------
-        value : str
-            The value of the metadata.
-        """
-        line_edit = QtWidgets.QLineEdit(str(value))
-        line_edit.setEnabled(False)
-        return TagData(value=value, line_edit=line_edit)
 
-    @staticmethod
-    def change_widget_background_colour(
-        widget: QtWidgets.QWidget, colour: QtCore.Qt.GlobalColor
-    ) -> None:
-        """Change a widget background colour to the assigned colour.
+def change_widget_background_colour(
+    widget: QtWidgets.QWidget, colour: QtCore.Qt.GlobalColor
+) -> None:
+    """Change a widget background colour to the assigned colour.
 
-        Currently only accepts PyQt pre-set colours.
+    Accept only PyQt pre-set colours.
 
-        Parameters
-        ----------
-        widget : QWidget
-            The widget to modify.
-        colour : GlobalColor
-            A PyQt pre-set colour.
-            See complete list at https://doc.qt.io/qt-6/qt.html#GlobalColor-enum.
-        """
-        palette = QtGui.QPalette()
-        palette.setColor(QtGui.QPalette.ColorRole.Base, QtGui.QColor(colour))
-        widget.setPalette(palette)
+    Parameters
+    ----------
+    widget : QWidget
+        The widget to modify.
+    colour : GlobalColor
+        A PyQt pre-set colour.
+        See complete list at https://doc.qt.io/qt-6/qt.html#GlobalColor-enum.
+    """
+    palette = QtGui.QPalette()
+    palette.setColor(QtGui.QPalette.ColorRole.Base, QtGui.QColor(colour))
+    widget.setPalette(palette)
+
+
+def create_tags_from(
+    file_reader: pypdf.PdfReader,
+) -> tuple[dict[str, TagDataInteractive], dict[str, TagDataNotInteractive]]:
+    """Return two tag -> TagData dictionaries based on the file_reader metadata
+    (interactive, non-interactive)
+
+    Parameters
+    ----------
+    file_reader : PdfReader
+        The PdfReader object whose metadata are used.
+    """
+    assert file_reader.metadata
+    metadata: dict[str, str] = dict(file_reader.metadata)
+    tags_interactive = {tag: TagDataInteractive(metadata.get(tag, "")) for tag in TAGS}
+    tags_not_interactive = {
+        tag: TagDataNotInteractive(value)
+        for tag, value in metadata.items()
+        if tag not in TAGS
+    }
+    return tags_interactive, tags_not_interactive
 
 
 class MetadataPanel(QtWidgets.QWidget):
@@ -201,29 +213,13 @@ class MetadataPanel(QtWidgets.QWidget):
         self.file_path = file_path
         self.file_reader = file_reader
         self.backup = True
-        self.tags = self.create_tags(file_reader)
+        self.tags_interactive, self.tags_not_interactive = create_tags_from(file_reader)
         self.form, self.other_interactive_widgets = self.build_form()
 
-    @staticmethod
-    def create_tags(file_reader: pypdf.PdfReader) -> dict[str, TagData]:
-        """Return the tag -> TagData dictionary based on the file_reader metadata.
-
-        Parameters
-        ----------
-        file_reader : PdfReader
-            The PdfReader object whose metadata are used.
-        """
-        tags = defaultdict(TagData)
-        # Editable fields
-        for tag in TAGS:
-            tags[tag] = TagData.from_metadata_interactive(
-                file_reader.metadata.get(tag, "")
-            )
-        # Other (non-editable) fields
-        for tag, value in file_reader.metadata.items():
-            if tag not in TAGS:
-                tags[tag] = TagData.from_metadata_not_interactive(value)
-        return tags
+    @property
+    def tags(self) -> dict[str, TagDataInteractive | TagDataNotInteractive]:
+        """Return all tags."""
+        return self.tags_interactive | self.tags_not_interactive
 
     def build_form(
         self,
@@ -242,15 +238,14 @@ class MetadataPanel(QtWidgets.QWidget):
         path_field.setEnabled(False)
         form.addRow("Path", path_field)
         # Editable fields
-        for tag in TAGS:
+        for tag, widget in self.tags_interactive.items():
             row_layout = QtWidgets.QHBoxLayout()
-            row_layout.addWidget(self.tags[tag].line_edit)
-            row_layout.addWidget(self.tags[tag].reset_button)
+            row_layout.addWidget(widget.line_edit)
+            row_layout.addWidget(widget.reset_button)
             form.addRow(tag[1:], row_layout)
         # Other (non-editable) fields
-        for tag, data in self.tags.items():
-            if not data.interactive:
-                form.addRow(tag[1:], data.line_edit)
+        for tag, widget in self.tags_not_interactive.items():
+            form.addRow(tag[1:], widget.line_edit)
         # Empty space
         form.addRow(QtWidgets.QLabel())
         # Save button
@@ -258,7 +253,7 @@ class MetadataPanel(QtWidgets.QWidget):
         save_button.clicked.connect(self.save_file)
         # Reset All button
         reset_button = QtWidgets.QPushButton("Reset All")
-        for data in self.tags.values():
+        for data in self.tags_interactive.values():
             reset_button.clicked.connect(data.reset_function)
         # Align save/reset button horizontally
         buttons_layout = QtWidgets.QHBoxLayout()
@@ -276,10 +271,10 @@ class MetadataPanel(QtWidgets.QWidget):
         The resulting file path is the ``file_path`` attribute.
         If the ``backup`` attribute is set to True, the existing file at ``file_path`` (if any)
         is renamed to back it up."""
-        if all(not data.modified for data in self.tags.values()):
+        if all(not data.modified for data in self.tags_interactive.values()):
             return
-        for data in self.tags.values():
-            data.save_function()
+        for data in self.tags_interactive.values():
+            data.save_changes()
         if self.backup:
             self.create_file_backup(self.file_path)
         # Note: PdfWriter initialises the "/Producer" metadata with "pypdf".
@@ -331,7 +326,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     Attributes
     ----------
-    actions : dict[str, QAction]
+    actions_dict : dict[str, QAction]
         A dictionary to easily access the actions used in the menu.
     central_widget : QWidget
         The interface to edit metadata.
@@ -361,11 +356,11 @@ class MainWindow(QtWidgets.QMainWindow):
         Display a warning message if the file cannot be read in strict mode.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.setWindowTitle(APPLICATION_NAME)
         self.setGeometry(400, 400, 500, 500)
-        self.actions = self.create_actions()
+        self.actions_dict = self.create_actions()
         self.create_menu()
         self.central_widget = QtWidgets.QWidget()
         self.setAcceptDrops(True)
@@ -411,9 +406,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.menuBar().setNativeMenuBar(False)
         file_menu = self.menuBar().addMenu("File")
         help_menu = self.menuBar().addMenu("Help")
-        file_menu.addAction(self.actions["open"])
-        file_menu.addAction(self.actions["quit"])
-        help_menu.addAction(self.actions["about"])
+        file_menu.addAction(self.actions_dict["open"])
+        file_menu.addAction(self.actions_dict["quit"])
+        help_menu.addAction(self.actions_dict["about"])
 
     def show_about(self) -> None:
         """Display the "About" information."""
@@ -427,7 +422,7 @@ class MainWindow(QtWidgets.QMainWindow):
             ),
         )
 
-    def display_metadata(self, file_path: str) -> None:
+    def display_metadata(self, file_path: str | Path) -> None:
         """Create the interface to edit metadata and attach it to the central widget of the window.
 
         Parameters
@@ -438,7 +433,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if file_path:
             file_object = self.open_file(file_path)
             if file_object is not None:
-                self.central_widget = MetadataPanel(file_object, file_path)
+                self.central_widget = MetadataPanel(file_object, str(file_path))
                 self.setCentralWidget(self.central_widget)
 
     def select_file(self) -> None:
@@ -458,7 +453,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # Reimplement dragEnterEvent class method
     # pylint:disable-next=invalid-name
-    def dragEnterEvent(self, event: QtGui.QDragEnterEvent) -> None:
+    def dragEnterEvent(self, a0: QtGui.QDragEnterEvent) -> None:
         """Only accept drag events for certain data.
 
         Parameters
@@ -466,19 +461,19 @@ class MainWindow(QtWidgets.QMainWindow):
         event : QDragEnterEvent
         """
         # hasUrls is true when dragging files because of their path.
-        if event.mimeData().hasUrls:
-            event.accept()
+        if a0.mimeData().hasUrls():
+            a0.accept()
         else:
-            event.ignore()
+            a0.ignore()
 
     # Reimplement dropEvent class method
     # pylint:disable-next=invalid-name
-    def dropEvent(self, event: QtGui.QDropEvent) -> None:
+    def dropEvent(self, a0: QtGui.QDropEvent) -> None:
         """Attempt to open the file dropped onto the window."""
-        for url in event.mimeData().urls():
+        for url in a0.mimeData().urls():
             self.display_metadata(url.toLocalFile())
 
-    def open_file(self, file_path: str) -> Optional[pypdf.PdfReader]:
+    def open_file(self, file_path: str | Path) -> pypdf.PdfReader | None:
         """Return the PdfReader object for the file at ``file_path``, if possible.
 
         If the file cannot be opened (e.g. not a PDF file), display an error message.
@@ -504,6 +499,7 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             return None
         # If the file is password-protected, prompt the user to insert the password.
+        password = None
         if file_reader.is_encrypted:
             decrypted = None
             while not decrypted:

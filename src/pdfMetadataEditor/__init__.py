@@ -9,7 +9,7 @@ Dependencies: PyQt6, pypdf, pypdf[crypto]
 For more information, see the repository at https://github.com/Manitary/PDF-Metadata-Editor.
 """
 
-from .editor import MainWindow, TagData, MetadataPanel, main
+from .editor import MainWindow, MetadataPanel, main
 from ._version import __version__
 
-__all__ = ["__version__", "TagData", "MetadataPanel", "MainWindow", "main"]
+__all__ = ["__version__", "MetadataPanel", "MainWindow", "main"]
