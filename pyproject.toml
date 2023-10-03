@@ -4,28 +4,36 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "PDFMetadataEditor"
-version = "0.2"
+version = "0.3"
 authors = [
-  { name="Andrea Pachera" },
-  { name="Gianmarco Brocchi", email="gianmarcobrocchi@gmail.com" },
-  { name="Michele Mastropietro", email="michele.mastropietro@gmail.com" },
+  { name = "Andrea Pachera" },
+  { name = "Gianmarco Brocchi", email = "gianmarcobrocchi@gmail.com" },
+  { name = "Michele Mastropietro", email = "michele.mastropietro@gmail.com" },
 ]
 description = "A simple GUI to edit the PDF metadata"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Operating System :: OS Independent",
 ]
 
-dependencies = ["PyQt6", "pypdf", "pypdf[crypto]"]
+dependencies = ["PyQt6 >= 6.5.2", "pypdf >= 3.16.2", "pypdf[crypto]"]
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 
 [project.urls]
 "Homepage" = "https://github.com/Manitary/PDF-Metadata-Editor"
 
 [project.gui-scripts]
 pdf-metadata-editor = "pdfMetadataEditor.editor:main"
+
+[project.optional-dependencies]
+test = [
+  "pytest >= 7.4.2",
+  "pytest-cov >= 4.1.0",
+  "pytest-qt >= 4.2.0",
+  "tox >= 4.11.3",
+]

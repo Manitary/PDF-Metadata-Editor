@@ -1,5 +1,7 @@
 build/
 dist/
+.venv
 .coverage
 *.spec
 __pycache__
+.tox
